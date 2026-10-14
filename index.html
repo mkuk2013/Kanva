@@ -53,8 +53,11 @@
 <div class="auth-box">
       <h2 id="authTitle">Log in or sign up</h2>
       <p class="muted">Use your email to continue to Kanva.</p>
-      <div id="googleBtnWrap" style="display:none;justify-content:center;margin-top:12px"></div>
-      <button class="social-btn" id="googleFallback" onclick="googleNotice()"><span class="g">G</span> Continue with Google</button>
+      <div class="google-btn-zone" style="display:flex;justify-content:center;margin-top:12px;min-height:44px">
+        <div id="g_id_onload" data-client_id="1025444032477-u8clpon4uka5tuipkq7rd5vs7r137h9a.apps.googleusercontent.com" data-callback="handleGoogleCredential" data-auto_prompt="false"></div>
+        <div class="g_id_signin" data-type="standard" data-theme="outline" data-size="large" data-text="continue_with" data-shape="rectangular" data-logo_alignment="center" data-width="340"></div>
+        <button class="social-btn" id="googleFallback" style="display:none" onclick="googleNotice()"><span class="g">G</span> Continue with Google</button>
+      </div>
       <button class="social-btn" onclick="demoLogin()">⚡ Continue with Demo Account</button>
       <div class="or"><span>or</span></div>
       <form id="authForm" onsubmit="handleAuth(event)">
@@ -407,7 +410,7 @@
 <script>if (!window.fabric) { document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"><\/script>'); }</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="app.js?v=9"></script>
+<script src="app.js?v=10"></script>
 <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(()=>{}); }</script>
 </body>
 </html>
