@@ -138,7 +138,7 @@ function restoreSession(){
 /* ---------------- PER-USER STORAGE ---------------- */
 function designsKey(){ return 'kv_designs_' + (currentUser ? currentUser.email : 'guest'); }
 function getDesigns(){ return JSON.parse(localStorage.getItem(designsKey()) || '[]'); }
-function saveDesigns(d){ localStorage.setItem(designsKey(), JSON.stringify(d)); }
+function saveDesigns(d){ try { localStorage.setItem(designsKey(), JSON.stringify(d)); return true; } catch(e){ toast('⚠️ Phone storage full hai — purane designs/uploads delete karke dobara save karein'); return false; } }
 function planKey(){ return 'kv_plan_' + (currentUser ? currentUser.email : 'guest'); }
 function getPlan(){ return localStorage.getItem(planKey()) || 'free'; }
 function isPro(){ return getPlan() === 'pro'; }
@@ -179,6 +179,9 @@ function refreshPlanUI(){
   const pro = isPro();
   ['planBadge','planBadge2'].forEach(id => { const b = document.getElementById(id); if (b){ b.textContent = pro ? '⚡ PRO' : 'FREE'; b.className = 'plan-badge ' + (pro ? 'pro' : 'free'); } });
   const up = document.getElementById('userPlan'); if (up) up.textContent = pro ? 'Pro plan ⚡' : 'Free plan';
+  const ub = document.getElementById('upgradeBtn'); if (ub) ub.style.display = pro ? 'none' : '';
+  const pb = document.getElementById('pricingUpgradeBtn'); if (pb) pb.style.display = pro ? 'none' : '';
+  const pn = document.getElementById('pricingProNote'); if (pn) pn.style.display = pro ? '' : 'none';
   renderTemplateGrids();
 }
 function renderDashboard(){
@@ -256,7 +259,7 @@ function renderBrand(){
 }
 function addBrandColor(){ const b = getBrand(); b.colors.push(document.getElementById('bkColor').value); saveBrand(b); renderBrand(); toast('🎨 Brand color added'); }
 function removeBrandColor(i){ const b = getBrand(); b.colors.splice(i,1); saveBrand(b); renderBrand(); }
-function setBrandLogo(ev){ const f = ev.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => { const b = getBrand(); b.logo = r.result; saveBrand(b); renderBrand(); toast('🏷️ Brand logo saved'); }; r.readAsDataURL(f); }
+function setBrandLogo(ev){ const f = ev.target.files[0]; if (!f) return; processImageFile(f, dataUrl => { const b = getBrand(); b.logo = dataUrl; saveBrand(b); renderBrand(); toast('🏷️ Brand logo saved'); }); }
 function setBrandFont(f){ const b = getBrand(); b.font = f; saveBrand(b); toast('🔤 Brand font set to ' + f); }
 
 /* ================= EDITOR ================= */
@@ -320,7 +323,7 @@ function zoomOut(){ zoom = Math.max(.07, zoom / 1.15); applyZoom(); }
 /* history */
 function pushHistory(init){
   if (saving) return;
-  const json = JSON.stringify(canvas.toJSON(['selectable','evented','name']));
+  const json = JSON.stringify(canvas.toJSON(['selectable','evented','name','__locked','__f']));
   if (!init && history[hIndex] === json) return;
   history = history.slice(0, hIndex + 1); history.push(json);
   if (history.length > 60) history.shift();
@@ -363,6 +366,9 @@ function addShape(kind){
   if (kind==='heart') o = new fabric.Path('M 100 30 C 100 10 60 -10 32 12 C 4 34 10 70 100 140 C 190 70 196 34 168 12 C 140 -10 100 10 100 30 Z', { fill:'#ec4899', scaleX:s/200, scaleY:s/200, name:'Heart' });
   if (kind==='ring') o = new fabric.Circle({ radius:s/2, fill:'transparent', stroke:fill, strokeWidth:14, name:'Ring' });
   if (kind==='blob') o = new fabric.Circle({ radius:s/2, fill:'#00c4cc', name:'Blob' });
+  if (kind==='diamond') o = new fabric.Polygon([{x:0,y:-s/2},{x:s/2,y:0},{x:0,y:s/2},{x:-s/2,y:0}], { fill, name:'Diamond' });
+  if (kind==='hex'){ const pts=[]; for (let i=0;i<6;i++){ const a=Math.PI/3*i - Math.PI/2; pts.push({ x:(s/2)*Math.cos(a)+(s/2), y:(s/2)*Math.sin(a)+(s/2) }); } o = new fabric.Polygon(pts, { fill:'#22c55e', name:'Hexagon' }); }
+  if (kind==='plus'){ const v = new fabric.Rect({ left: s*.36, top: 0, width: s*.28, height: s, fill }); const hbar = new fabric.Rect({ left: 0, top: s*.36, width: s, height: s*.28, fill }); o = new fabric.Group([v, hbar], { name:'Plus' }); }
   if (o) center(o);
 }
 function addLine(kind){
@@ -424,6 +430,10 @@ function syncProps(){
   }
   if (typeof o.stroke === 'string') document.getElementById('pStroke').value = o.stroke;
   document.getElementById('pStrokeW').value = o.strokeWidth || 0;
+  if (isText){ const cs = document.getElementById('pCharSp'); if (cs) cs.value = o.charSpacing || 0; }
+  const bl = document.getElementById('btnLock');
+  if (bl){ bl.textContent = o.__locked ? '🔒 Locked' : '🔓 Lock'; bl.style.background = o.__locked ? '#efe9ff' : ''; }
+  syncImgCtx();
   renderLayers();
 }
 function setFill(v){ const o=active(); if(o){ o.set('fill', v); canvas.renderAll(); } }
@@ -443,6 +453,115 @@ function setShadow(kind){
   if (kind==='hard') o.set('shadow', new fabric.Shadow({ color:'rgba(0,0,0,.55)', blur:0, offsetX:6, offsetY:6 }));
   if (kind==='glow') o.set('shadow', new fabric.Shadow({ color:'#ec4899', blur:26, offsetX:0, offsetY:0 }));
   canvas.renderAll();
+}
+
+/* ---- Position / Flip / Group / Lock (Canva-style) ---- */
+function alignObj(pos){
+  const o = active(); if (!o) return;
+  const r = o.getBoundingRect();
+  let dx = 0, dy = 0;
+  if (pos==='left') dx = -r.left;
+  if (pos==='center') dx = currentSize.w/2 - (r.left + r.width/2);
+  if (pos==='right') dx = currentSize.w - (r.left + r.width);
+  if (pos==='top') dy = -r.top;
+  if (pos==='middle') dy = currentSize.h/2 - (r.top + r.height/2);
+  if (pos==='bottom') dy = currentSize.h - (r.top + r.height);
+  o.set({ left: o.left + dx, top: o.top + dy }); o.setCoords(); canvas.renderAll(); pushHistory(); markUnsaved();
+}
+function flipObj(axis){
+  const o = active(); if (!o) return;
+  if (axis==='x') o.set('flipX', !o.flipX); else o.set('flipY', !o.flipY);
+  canvas.renderAll(); pushHistory(); markUnsaved();
+}
+function groupObjs(){
+  const o = active(); if (!o) return;
+  if (o.type === 'activeSelection'){ o.toGroup(); const g = active(); if (g) g.name = 'Group'; canvas.renderAll(); pushHistory(); markUnsaved(); toast('🧩 Group ban gaya — ab sab ek sath move hoga'); }
+  else toast('Pehle 2 ya zyada cheezein select karein (canvas par drag karke) phir Group dabayein');
+}
+function ungroupObj(){
+  const o = active(); if (!o) return;
+  if (o.type === 'group'){ o.toActiveSelection(); canvas.renderAll(); pushHistory(); markUnsaved(); toast('Group khul gaya'); }
+  else toast('Ye group nahi hai');
+}
+function toggleLock(){
+  const o = active(); if (!o) return;
+  const locked = !o.__locked; o.__locked = locked;
+  o.set({ lockMovementX: locked, lockMovementY: locked, lockRotation: locked, lockScalingX: locked, lockScalingY: locked, hasControls: !locked });
+  canvas.renderAll(); syncProps(); pushHistory(); markUnsaved();
+  toast(locked ? '🔒 Locked — ye galti se move nahi hoga' : '🔓 Unlocked');
+}
+/* ---- Text extras ---- */
+function setCharSpacing(v){ const o=active(); if(o){ o.set('charSpacing', parseInt(v)||0); canvas.renderAll(); } }
+function setTextBg(v){ const o=active(); if(o){ o.set('textBackgroundColor', v); canvas.renderAll(); } }
+function clearTextBg(){ const o=active(); if(o){ o.set('textBackgroundColor', ''); canvas.renderAll(); } }
+/* ---- Photo filters (Canva "Edit image") ---- */
+function applyFilters(){
+  const o = active(); if (!o || o.type !== 'image') return;
+  const f = o.__f || { b:0, c:0, s:0, bw:false, sepia:false };
+  const arr = [];
+  if (f.b) arr.push(new fabric.Image.filters.Brightness({ brightness: f.b/100 }));
+  if (f.c) arr.push(new fabric.Image.filters.Contrast({ contrast: f.c/100 }));
+  if (f.s) arr.push(new fabric.Image.filters.Saturation({ saturation: f.s/100 }));
+  if (f.bw) arr.push(new fabric.Image.filters.Grayscale());
+  if (f.sepia) arr.push(new fabric.Image.filters.Sepia());
+  o.filters = arr; o.applyFilters(); canvas.renderAll(); pushHistory(); markUnsaved();
+}
+function setFilter(kind, v){
+  const o = active(); if (!o || o.type !== 'image') return;
+  o.__f = o.__f || { b:0, c:0, s:0, bw:false, sepia:false };
+  if (kind==='bw' || kind==='sepia') o.__f[kind] = !o.__f[kind]; else o.__f[kind] = parseInt(v)||0;
+  applyFilters(); syncImgCtx();
+}
+function resetFilters(){ const o = active(); if (!o) return; o.__f = { b:0, c:0, s:0, bw:false, sepia:false }; applyFilters(); syncImgCtx(); toast('Photo filters reset'); }
+function syncImgCtx(){
+  const o = active(); const ic = document.getElementById('imgCtx'); if (!ic) return;
+  const isImg = !!o && o.type === 'image';
+  ic.style.display = isImg ? '' : 'none';
+  if (isImg){
+    const f = o.__f || { b:0, c:0, s:0, bw:false, sepia:false };
+    document.getElementById('fBright').value = f.b;
+    document.getElementById('fContrast').value = f.c;
+    document.getElementById('fSat').value = f.s;
+    document.getElementById('btnBW').style.background = f.bw ? '#efe9ff' : '';
+    document.getElementById('btnSepia').style.background = f.sepia ? '#efe9ff' : '';
+  }
+}
+/* ---- Draw (freehand) ---- */
+let drawing = false;
+function toggleDraw(){
+  if (!canvas) return;
+  drawing = !drawing;
+  canvas.isDrawingMode = drawing;
+  const btn = document.getElementById('drawBtn');
+  if (drawing){
+    canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
+    drawOpt();
+    canvas.discardActiveObject(); canvas.renderAll();
+  }
+  btn.textContent = drawing ? '✅ Drawing ON — band karne ke liye dabayein' : '✏️ Start drawing';
+  btn.style.background = drawing ? '#efe9ff' : '';
+  toast(drawing ? '✏️ Draw mode ON — canvas par draw karein' : 'Draw mode OFF');
+}
+function drawOpt(){
+  if (canvas && canvas.freeDrawingBrush){
+    canvas.freeDrawingBrush.color = document.getElementById('drawColor').value;
+    canvas.freeDrawingBrush.width = parseInt(document.getElementById('drawWidth').value) || 8;
+  }
+}
+/* ---- Background patterns ---- */
+function setBgPattern(kind){
+  const pc = document.createElement('canvas'); pc.width = pc.height = 28;
+  const g = pc.getContext('2d');
+  g.fillStyle = '#ffffff'; g.fillRect(0,0,28,28);
+  g.fillStyle = '#ddd3f5'; g.strokeStyle = '#ddd3f5';
+  if (kind==='dots'){ g.beginPath(); g.arc(7,7,3.2,0,7); g.arc(21,21,3.2,0,7); g.fill(); }
+  if (kind==='grid'){ g.lineWidth = 2; g.strokeRect(0,0,28,28); }
+  if (kind==='lines'){ g.lineWidth = 3; g.beginPath(); g.moveTo(-2,30); g.lineTo(30,-2); g.stroke(); }
+  removeBgRect(); canvas.setBackgroundColor('#ffffff', () => {});
+  const rect = new fabric.Rect({ left:0, top:0, width: currentSize.w, height: currentSize.h, selectable:false, evented:false, name:'__bg' });
+  rect.set('fill', new fabric.Pattern({ source: pc, repeat: 'repeat' }));
+  canvas.add(rect); rect.sendToBack(); canvas.renderAll(); pushHistory(); markUnsaved();
+  toast('🎨 Pattern background lag gaya');
 }
 
 /* layers */
@@ -470,7 +589,7 @@ function switchTab(t){
   if (t === 'layers') renderLayers();
 }
 function buildSidebars(){
-  const shapes = [['rect','▭'],['round','▢'],['circle','●'],['triangle','▲'],['star','★'],['heart','❤'],['ring','◎'],['blob','⬤']];
+  const shapes = [['rect','▭'],['round','▢'],['circle','●'],['triangle','▲'],['star','★'],['heart','❤'],['ring','◎'],['blob','⬤'],['diamond','◆'],['hex','⬢'],['plus','➕']];
   document.getElementById('shapeGrid').innerHTML = shapes.map(([k,ic]) => `<div class="el-cell" onclick="addShape('${k}')" title="${k}">${ic}</div>`).join('');
   document.getElementById('lineGrid').innerHTML = [['line','━'],['arrow','➔'],['dash','┅']].map(([k,ic]) => `<div class="el-cell" onclick="addLine('${k}')" title="${k}">${ic}</div>`).join('');
   document.getElementById('frameGrid').innerHTML = [['frame','🖼️'],['cframe','⭕'],['chart','📊'],['badge','🏷️']].map(([k,ic]) => `<div class="el-cell" onclick="addFrame('${k}')" title="${k}">${ic}</div>`).join('');
@@ -486,6 +605,8 @@ function buildSidebars(){
   }
   const grads = [['#8b3dff','#ec4899'],['#f5a623','#ef4444'],['#00c4cc','#3b82f6'],['#22c55e','#00c4cc'],['#f43f5e','#f5a623'],['#0f172a','#8b3dff'],['#fdfbfb','#ebedee'],['#134e5e','#71b280']];
   document.getElementById('bgGradients').innerHTML = grads.map(([a,bb]) => `<div class="swatch" style="background:linear-gradient(135deg,${a},${bb})" onclick="setBgGradient('${a}','${bb}')"></div>`).join('');
+  const pats = [['dots','⚫ Dots'],['grid','▦ Grid'],['lines','≋ Lines']];
+  document.getElementById('bgPatterns').innerHTML = pats.map(([k,l]) => `<div class="swatch pat-swatch" title="${l}" onclick="setBgPattern('${k}')">${l}</div>`).join('');
   renderTemplateLists();
 }
 function setBgColor(c){ removeBgRect(); canvas.setBackgroundColor(c, () => canvas.renderAll()); pushHistory(); markUnsaved(); }
@@ -498,8 +619,35 @@ function setBgGradient(a, b){
 }
 
 /* uploads + photos */
+/* Phone photos are huge — shrink them before storing, otherwise the browser
+   storage (localStorage) silently rejects them and uploads "don't open". */
+function processImageFile(file, cb){
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    const max = 1280, sc = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+    if (sc >= 1 && file.size < 900000){ URL.revokeObjectURL(url); const r = new FileReader(); r.onload = () => cb(r.result); r.readAsDataURL(file); return; }
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.naturalWidth * sc); c.height = Math.round(img.naturalHeight * sc);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    URL.revokeObjectURL(url);
+    cb(c.toDataURL('image/jpeg', .85));
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); const r = new FileReader(); r.onload = () => cb(r.result); r.readAsDataURL(file); };
+  img.src = url;
+}
+function storeUploads(){
+  try { localStorage.setItem('kv_uploads', JSON.stringify(uploads)); return true; }
+  catch(e){ uploads.pop(); try { localStorage.setItem('kv_uploads', JSON.stringify(uploads)); } catch(e2){} toast('⚠️ Storage full — purani uploads/designs delete karein'); return false; }
+}
 function handleUpload(ev){
-  [...ev.target.files].forEach(f => { const r = new FileReader(); r.onload = () => { uploads.unshift(r.result); if (uploads.length > 24) uploads.pop(); localStorage.setItem('kv_uploads', JSON.stringify(uploads)); renderUploads(); }; r.readAsDataURL(f); });
+  const files = [...ev.target.files];
+  let done = 0;
+  files.forEach(f => processImageFile(f, dataUrl => {
+    uploads.unshift(dataUrl); if (uploads.length > 24) uploads.pop();
+    storeUploads(); renderUploads();
+    if (++done === files.length) toast('📤 Upload ho gaya — photo par tap karke design mein add karein');
+  }));
   ev.target.value = '';
 }
 function renderUploads(){
@@ -706,7 +854,7 @@ function startBlank(sizeId){
 /* ================= SAVE / LOAD ================= */
 function designSnapshot(){
   canvas.discardActiveObject(); canvas.renderAll();
-  return { json: JSON.stringify(canvas.toJSON(['selectable','evented','name'])),
+  return { json: JSON.stringify(canvas.toJSON(['selectable','evented','name','__locked','__f'])),
     bg: typeof canvas.backgroundColor === 'string' ? canvas.backgroundColor : '#ffffff',
     thumb: canvas.toDataURL({ format:'jpeg', quality:.6, multiplier: Math.min(300/currentSize.w, 1) }) };
 }
@@ -748,7 +896,7 @@ function parseShareHash(){
 function openShare(){
   if (!canvas) return;
   saveDesign(false);
-  const link = location.origin + location.pathname + '#d=' + btoa(unescape(encodeURIComponent(JSON.stringify(canvas.toJSON(['selectable','evented','name'])))));
+  const link = location.origin + location.pathname + '#d=' + btoa(unescape(encodeURIComponent(JSON.stringify(canvas.toJSON(['selectable','evented','name','__locked','__f'])))));
   document.getElementById('shareLink').value = link;
   openModal('shareModal');
 }
