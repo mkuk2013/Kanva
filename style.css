@@ -296,3 +296,44 @@ button{cursor:pointer;font-family:inherit}
 .team-info{flex:1;display:flex;flex-direction:column}
 .team-info span{font-size:12px;color:#7a8194}
 @media(max-width:900px){.side-nav .snav[data-page="team"]:before{content:'👥'}}
+
+/* ============ MOBILE PASS (2026-10-15) ============ */
+@media(max-width:900px){
+  html,body{overflow-x:hidden}
+  .page{padding:8px 12px 90px}
+  .app-top{padding:10px 12px;gap:8px}
+  .app-top .search-wrap{flex:1;min-width:0;padding:8px 12px}
+  .app-top #installBtn{display:none!important}
+  .app-top .btn-upgrade{padding:8px 10px;font-size:12px;white-space:nowrap}
+  .hero-banner{padding:22px 14px 18px;border-radius:16px}
+  .hero-search{padding:11px 13px}
+  .type-item{width:70px;font-size:10.5px}
+  .type-ic{width:46px;height:46px;font-size:20px}
+  .tpl-grid{grid-template-columns:repeat(auto-fill,minmax(126px,1fr));gap:10px}
+  .design-grid{grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:10px}
+  .recent-card{min-width:118px}
+  .price-grid{grid-template-columns:1fr;max-width:440px}
+  .stat-grid{grid-template-columns:repeat(2,1fr)}
+  .sa-user{flex-wrap:wrap;row-gap:8px}
+  .team-add input,.team-add select{min-width:100%}
+  .modal-card{width:calc(100vw - 28px);max-height:88vh;overflow-y:auto}
+  /* --- editor: panel becomes a slide-over drawer, canvas gets the room --- */
+  .ed-topbar{overflow-x:auto;scrollbar-width:none;padding:8px 10px;gap:7px}
+  .ed-topbar::-webkit-scrollbar{display:none}
+  .ed-topbar>*{flex:none}
+  .ed-topbar .doc-title{max-width:118px;font-size:13px}
+  .ed-topbar .saved-note{display:none}
+  .ed-topbar #planBadge2{display:none}
+  .ctx-bar{padding:6px 8px;gap:6px}
+  .rail{width:58px;padding:8px 4px}
+  .rail-btn{padding:8px 1px;font-size:16px}
+  .rail-btn span{font-size:8.5px}
+  .sidepanel{position:fixed;top:104px;bottom:0;left:58px;width:min(294px,82vw);z-index:90;box-shadow:0 14px 44px rgba(20,10,60,.30);border-radius:0 16px 16px 0;transform:translateX(-118%);transition:transform .22s ease}
+  .sidepanel.open{transform:none}
+  .stage{padding:12px}
+}
+@media(max-width:420px){
+  .tpl-grid{grid-template-columns:repeat(2,1fr)}
+  .design-grid{grid-template-columns:repeat(2,1fr)}
+  .dc-btns button{padding:5px 7px;font-size:11px}
+}
