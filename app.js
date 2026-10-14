@@ -93,36 +93,18 @@ function handleGoogleCredential(resp){
     toast('🎉 Welcome, ' + u.name.split(' ')[0] + ' — signed in with Google');
   } catch(e){ toast('Google login failed — please try again'); }
 }
-let gisTries = 0;
-function loadGisScript(){
-  if (window.google && google.accounts) return;
-  if (document.querySelector('script[data-gis]')) return;
-  const s = document.createElement('script');
-  s.src = 'https://accounts.google.com/gsi/client';
-  s.async = true; s.defer = true; s.setAttribute('data-gis', '1');
-  s.onerror = () => { s.remove(); setTimeout(loadGisScript, 3000); };
-  document.head.appendChild(s);
-}
 function initGoogle(){
   if (!GOOGLE_CLIENT_ID) return;
-  loadGisScript();
   const tryInit = () => {
     if (window.google && google.accounts && google.accounts.id){
-      try {
-        google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleCredential });
-        const wrap = document.getElementById('googleBtnWrap');
-        if (wrap && !wrap.dataset.rendered){
-          wrap.dataset.rendered = '1';
-          wrap.style.display = 'flex';
-          const fb = document.getElementById('googleFallback'); if (fb) fb.style.display = 'none';
-          google.accounts.id.renderButton(wrap, { theme: 'outline', size: 'large', width: 340, text: 'continue_with', shape: 'rectangular', logo_alignment: 'center' });
-        }
-      } catch(e){ setTimeout(tryInit, 900); }
-    } else {
-      gisTries++;
-      if (gisTries === 15){ const old = document.querySelector('script[data-gis]'); if (old) old.remove(); loadGisScript(); }
-      setTimeout(tryInit, 400);
-    }
+      google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleCredential });
+      const wrap = document.getElementById('googleBtnWrap');
+      if (wrap){
+        wrap.style.display = 'flex';
+        const fb = document.getElementById('googleFallback'); if (fb) fb.style.display = 'none';
+        google.accounts.id.renderButton(wrap, { theme: 'outline', size: 'large', width: 340, text: 'continue_with', shape: 'rectangular', logo_alignment: 'center' });
+      }
+    } else setTimeout(tryInit, 400);
   };
   tryInit();
 }
