@@ -1127,9 +1127,13 @@ function focusAuth(signup){
   setTimeout(() => { const e = document.getElementById('auEmail'); if (e) e.focus({ preventScroll: true }); }, 550);
 }
 function showcaseTpl(id){ pendingTpl = id; focusAuth(true); toast('🎨 Pehle free account bana lo — ye template khud editor mein khul jayega'); }
+function templateThumb(t){
+  const bg = (t && t.bg) || ['#8b3dff','#ec4899'];
+  return 'linear-gradient(135deg,' + bg[0] + ',' + bg[1] + ')';
+}
 function renderShowcase(){
   const g = document.getElementById('showcaseGrid'); if (!g) return;
-  g.innerHTML = TEMPLATES.map(t => `<div class="tpl-card" style="background:${templateThumb(t)}" onclick="showcaseTpl('${t.id}')">${t.pro ? '<span class="lock-badge">⚡ PRO</span>' : ''}<div><div class="tpl-title">${t.name}</div><div class="tpl-sub">${t.cat}</div></div></div>`).join('');
+  g.innerHTML = TEMPLATES.map(t => `<div class="tpl-card" style="background:${templateThumb(t)}" onclick="showcaseTpl('${t.id}')">${t.pro ? '<span class="lock-badge">⚡ PRO</span>' : ''}<div><div class="tpl-title">${t.title}</div><div class="tpl-sub">${t.cat}</div></div></div>`).join('');
 }
 
 /* ================= UI helpers / init ================= */
@@ -1153,8 +1157,11 @@ let deferredPrompt = null;
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredPrompt = e; const b = document.getElementById('installBtn'); if (b) b.style.display = ''; });
 function installApp(){ if (deferredPrompt){ deferredPrompt.prompt(); deferredPrompt.userChoice.then(() => { deferredPrompt = null; }); } else toast('Browser menu ⋮ → “Install app / Add to Home screen”'); }
 
-/* init */
-renderTemplateGrids();
-renderShowcase();
+/* init — session restore FIRST, and each step isolated so a render
+   error can never block login restore again */
+let sessionRestored = false;
+try { sessionRestored = restoreSession(); } catch(e){}
+if (!sessionRestored){ document.getElementById('view-auth').style.display = ''; }
+try { renderTemplateGrids(); } catch(e){}
+try { renderShowcase(); } catch(e){}
 googleWatchdog();
-if (!restoreSession()){ document.getElementById('view-auth').style.display = ''; }
