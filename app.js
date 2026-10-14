@@ -109,6 +109,7 @@ function startSession(u){
   currentUser = { name: u.name, email: u.email, picture: u.picture || '' };
   localStorage.setItem('kv_session', u.email);
   enterApp();
+  if (pendingTpl){ const _pt = pendingTpl; pendingTpl = null; setTimeout(() => openTpl(_pt), 450); }
   const shared = parseShareHash();
   if (shared) openSharedDesign(shared);
 }
@@ -873,6 +874,20 @@ function saDeleteUser(email){
   renderSuperAdmin(); toast('🗑 User deleted: ' + email);
 }
 
+/* ================= LANDING PAGE ================= */
+let pendingTpl = null;
+function focusAuth(signup){
+  const card = document.getElementById('authCard');
+  if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  if (signup === true && authMode === 'login') toggleAuthMode();
+  setTimeout(() => { const e = document.getElementById('auEmail'); if (e) e.focus({ preventScroll: true }); }, 550);
+}
+function showcaseTpl(id){ pendingTpl = id; focusAuth(true); toast('🎨 Pehle free account bana lo — ye template khud editor mein khul jayega'); }
+function renderShowcase(){
+  const g = document.getElementById('showcaseGrid'); if (!g) return;
+  g.innerHTML = TEMPLATES.map(t => `<div class="tpl-card" style="background:${templateThumb(t)}" onclick="showcaseTpl('${t.id}')">${t.pro ? '<span class="lock-badge">⚡ PRO</span>' : ''}<div><div class="tpl-title">${t.name}</div><div class="tpl-sub">${t.cat}</div></div></div>`).join('');
+}
+
 /* ================= UI helpers / init ================= */
 function openModal(id){ document.getElementById(id).style.display = 'flex'; }
 function closeModal(id){ document.getElementById(id).style.display = 'none'; }
@@ -896,5 +911,6 @@ function installApp(){ if (deferredPrompt){ deferredPrompt.prompt(); deferredPro
 
 /* init */
 renderTemplateGrids();
+renderShowcase();
 initGoogle();
 if (!restoreSession()){ document.getElementById('view-auth').style.display = ''; }

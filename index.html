@@ -7,28 +7,50 @@
 <meta name="description" content="Kanva — create stunning posts, thumbnails, logos, presentations and more. Free plan + Pro via Easypaisa.">
 <meta name="theme-color" content="#8b3dff">
 <link rel="manifest" href="manifest.json">
-<link rel="icon" href="Kanva icon 192.png">
+<link rel="icon" href="kanva-logo.png">
 <link rel="apple-touch-icon" href="Kanva icon 192.png">
-<link rel="stylesheet" href="style.css?v=2">
+<link rel="stylesheet" href="style.css?v=3">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700&family=Bebas+Neue&family=Pacifico&family=Montserrat:wght@500;700;900&family=Roboto:wght@400;700&family=Oswald:wght@500;700&family=Dancing+Script:wght@700&family=Anton&family=Lobster&display=swap" rel="stylesheet">
 </head>
 <body>
 
-<!-- ================= AUTH ================= -->
+<!-- ================= LANDING + AUTH ================= -->
 <div id="view-auth">
-  <div class="auth-left">
-    <div class="auth-brand"><div class="brand-mark light"><img src="Kanva icon 512.png" alt="Kanva logo"></div><span>Kanva</span></div>
-    <h1>Design, present<br>and wow your<br>audience.</h1>
-    <p>Create social posts, thumbnails, logos, posters, presentations — everything, in minutes.</p>
-    <div class="auth-cards">
-      <div class="mini-card c1">🎉<b>Happy Birthday</b><span>TO YOU!</span></div>
-      <div class="mini-card c2">MEGA SALE<b>50% OFF</b><span>SHOP NOW</span></div>
-      <div class="mini-card c3">HOW TO<b>MAKE MONEY</b><span>ONLINE 💰</span></div>
+  <header class="lp-nav">
+    <div class="lp-brand"><img src="kanva-logo.png" alt="Kanva logo"><span>Kanva</span></div>
+    <nav class="lp-links">
+      <a href="#lp-tools">Features</a>
+      <a href="#lp-templates">Templates</a>
+      <a href="#lp-pricing">Pricing</a>
+    </nav>
+    <div class="lp-nav-btns">
+      <button class="btn btn-ghost" onclick="focusAuth()">Log in</button>
+      <button class="btn btn-primary" onclick="focusAuth(true)">Sign up free</button>
     </div>
-  </div>
-  <div class="auth-right">
-    <div class="auth-box">
+  </header>
+
+  <section class="lp-hero">
+    <div class="lp-hero-inner">
+      <div class="lp-hero-text">
+        <h1>What will you design today?</h1>
+        <p>Kanva makes it easy to create social posts, thumbnails, logos, posters and presentations — free to start, right in your browser.</p>
+        <div class="lp-hero-cta">
+          <button class="btn btn-primary big" onclick="focusAuth(true)">Start designing — it's free</button>
+          <button class="btn btn-white big" onclick="demoLogin()">⚡ Try the live demo</button>
+        </div>
+        <div class="lp-floats" aria-hidden="true">
+          <span class="float-el fe1">T</span>
+          <span class="float-el fe2">❤️</span>
+          <span class="float-el fe3">🖼️</span>
+          <span class="float-el fe4">⭐</span>
+          <span class="float-el fe5">▶️</span>
+          <span class="float-el fe6">Aa</span>
+        </div>
+      </div>
+      <div class="auth-right">
+        <div class="auth-card" id="authCard">
+<div class="auth-box">
       <h2 id="authTitle">Log in or sign up</h2>
       <p class="muted">Use your email to continue to Kanva.</p>
       <div id="googleBtnWrap" style="display:none;justify-content:center;margin-top:12px"></div>
@@ -45,14 +67,49 @@
       <p class="auth-err" id="authErr"></p>
       <p class="tiny muted">Free plan included · Pro Rs 599/month via Easypaisa · By continuing you agree to Kanva's terms.</p>
     </div>
-  </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="lp-section" id="lp-tools">
+    <h2>Everything you need to design your best work</h2>
+    <p class="lp-sub">One simple editor for every kind of design.</p>
+    <div class="lp-cards">
+      <div class="lp-card c1"><span class="lp-card-ic">🎨</span><h3>Drag &amp; drop editor</h3><p>Move, resize and style anything on the canvas — text, photos, shapes and stickers — with ready-made fonts, shadows and effects.</p></div>
+      <div class="lp-card c2"><span class="lp-card-ic">📐</span><h3>Templates that start you off</h3><p>Sale posts, quotes, invites, menus, course promos and more. Pick a template, change the words, and it is yours.</p></div>
+      <div class="lp-card c3"><span class="lp-card-ic">🖼️</span><h3>Photos &amp; elements built in</h3><p>A photo library, shapes, lines, frames and stickers are already inside — plus upload your own images and logo.</p></div>
+      <div class="lp-card c4"><span class="lp-card-ic">⬇️</span><h3>Download in one click</h3><p>Export your design as PNG, JPG or PDF. Go Pro for full HD downloads without the watermark.</p></div>
+    </div>
+  </section>
+
+  <section class="lp-section" id="lp-templates">
+    <h2>Start from a template</h2>
+    <p class="lp-sub">Tap any design to open it in the editor.</p>
+    <div class="showcase-grid" id="showcaseGrid"></div>
+  </section>
+
+  <section class="lp-section" id="lp-pricing">
+    <h2>Simple, honest pricing</h2>
+    <p class="lp-sub">Start free. Upgrade when you are ready — pay easily with Easypaisa.</p>
+    <div class="lp-pricing">
+      <div class="lp-price-card"><h3>Free</h3><div class="price">Rs 0</div><ul><li>✅ Full drag &amp; drop editor</li><li>✅ Free templates</li><li>✅ PNG / JPG / PDF export</li><li>✅ 5 saved projects</li></ul></div>
+      <div class="lp-price-card pro"><h3>⚡ Kanva Pro</h3><div class="price">Rs 599<span>/month</span></div><p class="yearly">or Rs 4,999/year — 2 months free</p><ul><li>✅ All 20 templates unlocked</li><li>✅ HD export, no watermark</li><li>✅ Unlimited saved projects</li><li>✅ Brand Kit (colors, logo, fonts)</li></ul></div>
+    </div>
+    <button class="btn btn-primary big" onclick="focusAuth(true)">Create your free account</button>
+  </section>
+
+  <footer class="lp-footer">
+    <div class="lp-brand"><img src="kanva-logo.png" alt="Kanva logo"><span>Kanva</span></div>
+    <p>© 2026 Kanva · Design, present, wow · Payments via Easypaisa 03363268833 (Mukesh Kumar)</p>
+  </footer>
 </div>
 
 <!-- ================= APP SHELL ================= -->
 <div id="view-app" style="display:none">
   <!-- sidebar -->
   <aside class="sidebar">
-    <div class="side-brand"><div class="brand-mark"><img src="Kanva icon 512.png" alt="Kanva logo"></div><span>Kanva</span></div>
+    <div class="side-brand"><div class="brand-mark"><img src="kanva-logo.png" alt="Kanva logo"></div><span>Kanva</span></div>
     <button class="create-btn" onclick="toggleCreateMenu()">＋ Create new</button>
     <div id="createMenu" class="create-menu" style="display:none"></div>
     <nav class="side-nav">
@@ -319,7 +376,7 @@
 <script>if (!window.fabric) { document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"><\/script>'); }</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="app.js?v=5"></script>
+<script src="app.js?v=6"></script>
 <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(()=>{}); }</script>
 </body>
 </html>
