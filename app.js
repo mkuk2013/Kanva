@@ -68,8 +68,7 @@ function demoLogin(){
   startSession(u); toast('⚡ Logged in with Demo Account');
 }
 function googleNotice(){
-  if (GOOGLE_CLIENT_ID){ toast('⏳ Google load ho raha hai — 2 second ruk kar upar wala Google button dobara dekhein'); initGoogle(); }
-  else toast('Google sign-in abhi setup ho raha hai — filhal email ya Demo account se login karein 👍');
+  toast('⚠️ Google ka button load nahi ho saka — page refresh karke dobara try karein, ya email/Demo se login karein');
 }
 /* ---------- Google Sign-In (Gmail) ---------- */
 function decodeJwt(token){
@@ -93,20 +92,15 @@ function handleGoogleCredential(resp){
     toast('🎉 Welcome, ' + u.name.split(' ')[0] + ' — signed in with Google');
   } catch(e){ toast('Google login failed — please try again'); }
 }
-function initGoogle(){
-  if (!GOOGLE_CLIENT_ID) return;
-  const tryInit = () => {
-    if (window.google && google.accounts && google.accounts.id){
-      google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleCredential });
-      const wrap = document.getElementById('googleBtnWrap');
-      if (wrap){
-        wrap.style.display = 'flex';
-        const fb = document.getElementById('googleFallback'); if (fb) fb.style.display = 'none';
-        google.accounts.id.renderButton(wrap, { theme: 'outline', size: 'large', width: 340, text: 'continue_with', shape: 'rectangular', logo_alignment: 'center' });
-      }
-    } else setTimeout(tryInit, 400);
-  };
-  tryInit();
+/* Google button is rendered declaratively by the GIS library itself
+   (g_id_onload + g_id_signin markup in index.html). This watchdog only
+   reveals our fallback button if Google's button truly fails to render. */
+function googleWatchdog(){
+  setTimeout(() => {
+    const zone = document.querySelector('.g_id_signin');
+    const fb = document.getElementById('googleFallback');
+    if (fb && (!zone || !zone.querySelector('iframe'))) fb.style.display = '';
+  }, 5000);
 }
 function startSession(u){
   currentUser = { name: u.name, email: u.email, picture: u.picture || '' };
@@ -1063,5 +1057,5 @@ function installApp(){ if (deferredPrompt){ deferredPrompt.prompt(); deferredPro
 /* init */
 renderTemplateGrids();
 renderShowcase();
-initGoogle();
+googleWatchdog();
 if (!restoreSession()){ document.getElementById('view-auth').style.display = ''; }
