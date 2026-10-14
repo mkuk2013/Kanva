@@ -31,7 +31,8 @@
     <div class="auth-box">
       <h2 id="authTitle">Log in or sign up</h2>
       <p class="muted">Use your email to continue to Kanva.</p>
-      <button class="social-btn" onclick="googleNotice()"><span class="g">G</span> Continue with Google</button>
+      <div id="googleBtnWrap" style="display:none;justify-content:center;margin-top:12px"></div>
+      <button class="social-btn" id="googleFallback" onclick="googleNotice()"><span class="g">G</span> Continue with Google</button>
       <button class="social-btn" onclick="demoLogin()">⚡ Continue with Demo Account</button>
       <div class="or"><span>or</span></div>
       <form id="authForm" onsubmit="handleAuth(event)">
@@ -304,7 +305,8 @@
 <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
 <script>if (!window.fabric) { document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"><\/script>'); }</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="app.js?v=2"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="app.js?v=3"></script>
 <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(()=>{}); }</script>
 </body>
 </html>

@@ -3,6 +3,9 @@
    Auth + Dashboard + Editor + Templates + Easypaisa Pro
    ============================================================ */
 const APP_NAME = 'Kanva';
+/* Google Sign-In: paste the OAuth Web Client ID (ends with .apps.googleusercontent.com).
+   It is a PUBLIC identifier (not a secret) — safe in frontend code. */
+const GOOGLE_CLIENT_ID = '';
 const EASYPAISA_NUMBER = '03363268833';
 const PRICES = { monthly: 599, yearly: 4999 };
 const SIZES = [
@@ -49,6 +52,7 @@ function handleAuth(e){
   } else {
     const u = users.find(u => u.email === email);
     if (!u){ err.textContent = 'No account with this email. Please sign up first.'; authMode='login'; toggleAuthMode(); authMode='signup'; document.getElementById('auEmail').value=email; return; }
+    if (u.google && u.pass === 'google'){ err.textContent = 'This account uses Google sign-in — please use the "Continue with Google" button.'; return; }
     if (u.pass !== hashPw(pass)){ err.textContent = 'Incorrect password. Please try again.'; return; }
     startSession(u); toast('👋 Welcome back, ' + u.name.split(' ')[0] + '!');
   }
@@ -59,9 +63,45 @@ function demoLogin(){
   if (!u){ u = { name:'Demo User', email:'demo@kanva.app', pass: hashPw('demo123'), created: Date.now() }; users.push(u); saveUsers(users); }
   startSession(u); toast('⚡ Logged in with Demo Account');
 }
-function googleNotice(){ toast('Google sign-in needs a Google Cloud setup — email sign up takes 20 seconds 👍'); if (authMode==='login') toggleAuthMode(); }
+function googleNotice(){ toast('Google sign-in abhi setup ho raha hai — filhal email ya Demo account se login karein 👍'); }
+/* ---------- Google Sign-In (Gmail) ---------- */
+function decodeJwt(token){
+  const part = token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+  const json = decodeURIComponent(atob(part).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+  return JSON.parse(json);
+}
+function handleGoogleCredential(resp){
+  try {
+    const p = decodeJwt(resp.credential);
+    if (!p || !p.email){ toast('Google login failed — please try again'); return; }
+    const email = p.email.toLowerCase();
+    const users = getUsers();
+    let u = users.find(x => x.email === email);
+    if (!u){
+      u = { name: p.name || email.split('@')[0], email, pass: 'google', google: true, picture: p.picture || '', created: Date.now() };
+      users.push(u);
+    } else { u.google = true; if (p.picture) u.picture = p.picture; if (p.name) u.name = p.name; }
+    saveUsers(users); startSession(u);
+    toast('🎉 Welcome, ' + u.name.split(' ')[0] + ' — signed in with Google');
+  } catch(e){ toast('Google login failed — please try again'); }
+}
+function initGoogle(){
+  if (!GOOGLE_CLIENT_ID) return;
+  const tryInit = () => {
+    if (window.google && google.accounts && google.accounts.id){
+      google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleCredential });
+      const wrap = document.getElementById('googleBtnWrap');
+      if (wrap){
+        wrap.style.display = 'flex';
+        const fb = document.getElementById('googleFallback'); if (fb) fb.style.display = 'none';
+        google.accounts.id.renderButton(wrap, { theme: 'outline', size: 'large', width: 340, text: 'continue_with', shape: 'rectangular', logo_alignment: 'center' });
+      }
+    } else setTimeout(tryInit, 400);
+  };
+  tryInit();
+}
 function startSession(u){
-  currentUser = { name: u.name, email: u.email };
+  currentUser = { name: u.name, email: u.email, picture: u.picture || '' };
   localStorage.setItem('kv_session', u.email);
   enterApp();
   const shared = parseShareHash();
@@ -78,7 +118,7 @@ function restoreSession(){
   if (!email) return false;
   const u = getUsers().find(x => x.email === email);
   if (!u) return false;
-  currentUser = { name: u.name, email: u.email };
+  currentUser = { name: u.name, email: u.email, picture: u.picture || '' };
   enterApp();
   const shared = parseShareHash();
   if (shared) openSharedDesign(shared);
@@ -104,7 +144,9 @@ function enterApp(){
   document.getElementById('view-editor').style.display = 'none';
   document.getElementById('view-app').style.display = '';
   const initials = currentUser.name.split(' ').map(w => w[0]).slice(0,2).join('').toUpperCase();
-  ['userAvatar','userAvatar2','userAvatar3'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = initials; });
+  ['userAvatar','userAvatar2','userAvatar3'].forEach(id => { const el = document.getElementById(id); if (!el) return;
+    if (currentUser.picture){ el.style.backgroundImage = 'url(' + currentUser.picture + ')'; el.style.backgroundSize = 'cover'; el.textContent = ''; }
+    else { el.style.backgroundImage = ''; el.textContent = initials; } });
   document.getElementById('userName').textContent = currentUser.name;
   if (!document.querySelector('.side-nav .admin-nav')){
     document.querySelector('.side-nav').insertAdjacentHTML('beforeend', '<a class="snav admin-nav" onclick="openAdmin()">🛠️ Admin orders</a>');
@@ -770,4 +812,5 @@ function installApp(){ if (deferredPrompt){ deferredPrompt.prompt(); deferredPro
 
 /* init */
 renderTemplateGrids();
+initGoogle();
 if (!restoreSession()){ document.getElementById('view-auth').style.display = ''; }
