@@ -332,6 +332,8 @@ function openEditor(sizeId, tplId){
   if (!canvas) initCanvas();
   if (sizeId) setSize(sizeId);
   if (tplId) applyTemplate(tplId);
+  const sp = document.querySelector('.sidepanel');
+  if (sp && window.innerWidth <= 900) sp.classList.remove('open');
   setTimeout(fitZoom, 60);
 }
 function customSize(){
@@ -361,6 +363,8 @@ function initCanvas(){
   canvas = new fabric.Canvas('c', { preserveObjectStacking: true, backgroundColor: '#ffffff' });
   canvas.setWidth(currentSize.w); canvas.setHeight(currentSize.h); updateSizeLbl();
   document.getElementById('pFont').innerHTML = FONTS.map(f => `<option value="${f}" style="font-family:'${f}'">${f}</option>`).join('');
+  const stageEl = document.getElementById('stage');
+  if (stageEl) stageEl.addEventListener('pointerdown', () => { if (window.innerWidth <= 900){ const p = document.querySelector('.sidepanel'); if (p) p.classList.remove('open'); } });
   canvas.on('selection:created', syncProps); canvas.on('selection:updated', syncProps);
   canvas.on('selection:cleared', () => { document.getElementById('ctxControls').style.display='none'; document.getElementById('ctxHint').style.display=''; renderLayers(); });
   ['object:added','object:removed','object:modified'].forEach(ev => canvas.on(ev, () => { if (!saving){ pushHistory(); markUnsaved(); } renderLayers(); }));
@@ -640,10 +644,20 @@ function delLayer(i){ const o = canvas.getObjects()[i]; if (o) canvas.remove(o);
 
 /* sidebars */
 function switchTab(t){
+  const prevBtn = document.querySelector('.rail-btn.active');
+  const prevTab = prevBtn ? prevBtn.dataset.tab : null;
+  const panel = document.querySelector('.sidepanel');
+  const wasOpen = panel ? panel.classList.contains('open') : false;
   document.querySelectorAll('.rail-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
   document.querySelectorAll('.tabpage').forEach(p => p.style.display = 'none');
   document.getElementById('tab-' + t).style.display = '';
   if (t === 'layers') renderLayers();
+  /* Mobile: panel is a slide-over drawer — tap a tool to open, tap it again to close */
+  if (window.innerWidth <= 900 && panel){
+    if (wasOpen && prevTab === t) panel.classList.remove('open');
+    else panel.classList.add('open');
+    setTimeout(fitZoom, 240);
+  }
 }
 function buildSidebars(){
   const shapes = [['rect','▭'],['round','▢'],['circle','●'],['triangle','▲'],['star','★'],['heart','❤'],['ring','◎'],['blob','⬤'],['diamond','◆'],['hex','⬢'],['plus','➕']];
