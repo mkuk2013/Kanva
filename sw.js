@@ -1,5 +1,5 @@
-/* Kanva service worker — app shell cache for offline use */
-const CACHE = 'kanva-v2';
+/* Kanva service worker — network-first for pages (fixes always land), cache-first for assets */
+const CACHE = 'kanva-v3';
 const SHELL = ['./', './index.html', './style.css?v=2', './app.js?v=2', './manifest.json', './Kanva icon 192.png', './Kanva icon 512.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -9,6 +9,18 @@ self.addEventListener('activate', e => {
 });
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+  const isPage = e.request.mode === 'navigate' || (e.request.headers.get('accept') || '').includes('text/html');
+  if (isPage) {
+    // Network-first: a fixed page must never be stuck behind an old cached copy.
+    e.respondWith(
+      fetch(e.request).then(res => {
+        const copy = res.clone();
+        caches.open(CACHE).then(c => { try { c.put('./index.html', copy); } catch(_){} });
+        return res;
+      }).catch(() => caches.match('./index.html'))
+    );
+    return;
+  }
   e.respondWith(
     caches.match(e.request).then(hit => hit || fetch(e.request).then(res => {
       const copy = res.clone();
