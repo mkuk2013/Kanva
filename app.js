@@ -105,6 +105,7 @@ function googleWatchdog(){
 function startSession(u){
   currentUser = { name: u.name, email: u.email, picture: u.picture || '' };
   localStorage.setItem('kv_session', u.email);
+  try { document.cookie = 'kv_session=' + encodeURIComponent(u.email) + '; max-age=' + (30*24*3600) + '; path=/; SameSite=Lax'; } catch(e){}
   enterApp();
   if (pendingTpl){ const _pt = pendingTpl; pendingTpl = null; setTimeout(() => openTpl(_pt), 450); }
   const shared = parseShareHash();
@@ -112,15 +113,22 @@ function startSession(u){
 }
 function logout(){
   localStorage.removeItem('kv_session'); currentUser = null;
+  try { document.cookie = 'kv_session=; max-age=0; path=/'; } catch(e){}
   document.getElementById('view-app').style.display = 'none';
   document.getElementById('view-editor').style.display = 'none';
   document.getElementById('view-auth').style.display = '';
 }
+function sessionEmail(){
+  const ls = localStorage.getItem('kv_session'); if (ls) return ls;
+  try { const m = document.cookie.match(/(?:^|; )kv_session=([^;]*)/); if (m) return decodeURIComponent(m[1]); } catch(e){}
+  return null;
+}
 function restoreSession(){
-  const email = localStorage.getItem('kv_session');
+  const email = sessionEmail();
   if (!email) return false;
   const u = getUsers().find(x => x.email === email);
   if (!u) return false;
+  localStorage.setItem('kv_session', email);
   if (u.blocked){ localStorage.removeItem('kv_session'); return false; }
   currentUser = { name: u.name, email: u.email, picture: u.picture || '' };
   enterApp();
