@@ -8,6 +8,9 @@ const APP_NAME = 'Kanva';
 const GOOGLE_CLIENT_ID = '';
 const EASYPAISA_NUMBER = '03363268833';
 const PRICES = { monthly: 599, yearly: 4999 };
+/* Super Admin: only these emails see the Super Admin panel and can manage users */
+const SUPER_ADMIN_EMAILS = ['mkuk2013@gmail.com'];
+function isSuperAdmin(){ return !!currentUser && SUPER_ADMIN_EMAILS.includes(currentUser.email); }
 const SIZES = [
   { id:'ig-post',  name:'Instagram Post',    w:1080, h:1080, icon:'📸' },
   { id:'ig-story', name:'Story / Reel',      w:1080, h:1920, icon:'📱' },
@@ -52,6 +55,7 @@ function handleAuth(e){
   } else {
     const u = users.find(u => u.email === email);
     if (!u){ err.textContent = 'No account with this email. Please sign up first.'; authMode='login'; toggleAuthMode(); authMode='signup'; document.getElementById('auEmail').value=email; return; }
+    if (u.blocked){ err.textContent = 'Your account has been blocked by the admin. Please contact support.'; return; }
     if (u.google && u.pass === 'google'){ err.textContent = 'This account uses Google sign-in — please use the "Continue with Google" button.'; return; }
     if (u.pass !== hashPw(pass)){ err.textContent = 'Incorrect password. Please try again.'; return; }
     startSession(u); toast('👋 Welcome back, ' + u.name.split(' ')[0] + '!');
@@ -81,6 +85,7 @@ function handleGoogleCredential(resp){
       u = { name: p.name || email.split('@')[0], email, pass: 'google', google: true, picture: p.picture || '', created: Date.now() };
       users.push(u);
     } else { u.google = true; if (p.picture) u.picture = p.picture; if (p.name) u.name = p.name; }
+    if (u.blocked){ toast('🚫 This account has been blocked by the admin.'); return; }
     saveUsers(users); startSession(u);
     toast('🎉 Welcome, ' + u.name.split(' ')[0] + ' — signed in with Google');
   } catch(e){ toast('Google login failed — please try again'); }
@@ -118,6 +123,7 @@ function restoreSession(){
   if (!email) return false;
   const u = getUsers().find(x => x.email === email);
   if (!u) return false;
+  if (u.blocked){ localStorage.removeItem('kv_session'); return false; }
   currentUser = { name: u.name, email: u.email, picture: u.picture || '' };
   enterApp();
   const shared = parseShareHash();
@@ -148,19 +154,21 @@ function enterApp(){
     if (currentUser.picture){ el.style.backgroundImage = 'url(' + currentUser.picture + ')'; el.style.backgroundSize = 'cover'; el.textContent = ''; }
     else { el.style.backgroundImage = ''; el.textContent = initials; } });
   document.getElementById('userName').textContent = currentUser.name;
-  if (!document.querySelector('.side-nav .admin-nav')){
-    document.querySelector('.side-nav').insertAdjacentHTML('beforeend', '<a class="snav admin-nav" onclick="openAdmin()">🛠️ Admin orders</a>');
+  const oldAdminNav = document.querySelector('.side-nav .admin-nav'); if (oldAdminNav) oldAdminNav.remove();
+  if (isSuperAdmin() && !document.querySelector('.side-nav .sa-nav')){
+    document.querySelector('.side-nav').insertAdjacentHTML('beforeend', '<a class="snav sa-nav" data-page="superadmin" onclick="goPage(\'superadmin\')">👑 Super Admin</a>');
   }
   refreshPlanUI(); renderDashboard(); goPage('home');
 }
 function showApp(){ document.getElementById('view-editor').style.display='none'; document.getElementById('view-app').style.display=''; renderDashboard(); }
 function goPage(p){
   document.querySelectorAll('.snav[data-page]').forEach(a => a.classList.toggle('active', a.dataset.page === p));
-  ['home','projects','templates','brand','pricing','trash'].forEach(x => { const el = document.getElementById('page-'+x); if (el) el.style.display = x === p ? '' : 'none'; });
+  ['home','projects','templates','brand','pricing','trash','superadmin'].forEach(x => { const el = document.getElementById('page-'+x); if (el) el.style.display = x === p ? '' : 'none'; });
   if (p === 'projects') renderProjects();
   if (p === 'templates') renderTemplateGrids();
   if (p === 'brand') renderBrand();
   if (p === 'trash') renderTrash();
+  if (p === 'superadmin') renderSuperAdmin();
   window.scrollTo(0,0);
 }
 function refreshPlanUI(){
@@ -786,7 +794,83 @@ function setOrder(id, status){
   const orders = getOrders(); const o = orders.find(x => x.id === id); if (!o) return;
   o.status = status; localStorage.setItem('kv_orders', JSON.stringify(orders));
   if (status === 'approved'){ localStorage.setItem('kv_plan_' + o.email, 'pro'); if (currentUser && currentUser.email === o.email) refreshPlanUI(); toast('⚡ Pro activated for ' + o.email); }
-  openAdmin(); renderOrders();
+  if (document.getElementById('adminModal').style.display !== 'none') openAdmin();
+  renderOrders(); renderSuperAdmin();
+}
+
+/* ================= SUPER ADMIN ================= */
+function userPlan(email){ return localStorage.getItem('kv_plan_' + email) || 'free'; }
+function userDesignCount(email){
+  try { return JSON.parse(localStorage.getItem('kv_designs_' + email) || '[]').filter(d => !d.trashed).length; } catch(e){ return 0; }
+}
+function orderCardHTML(o, withActions){
+  return `<div class="order-item"><span class="st ${o.status}">${o.status.toUpperCase()}</span> <b>${escapeHtml(o.name)}</b> (${escapeHtml(o.email || '')}) — ${escapeHtml(o.phone)}<br>
+  ${o.plan === 'yearly' ? 'Pro Yearly' : 'Pro Monthly'} · Rs ${o.amount} · TID: <b>${escapeHtml(o.tid)}</b> · ${o.date}
+  ${o.shot ? `<br><img src="${o.shot}" style="max-width:220px;border-radius:8px;margin-top:6px">` : ''}
+  ${withActions && o.status === 'pending' ? `<div style="margin-top:8px"><button class="mini-btn pro" onclick="setOrder(${o.id},'approved')">✅ Approve — Pro on karo</button> <button class="mini-btn del" onclick="setOrder(${o.id},'rejected')">❌ Reject</button></div>` : ''}</div>`;
+}
+function renderSuperAdmin(){
+  if (!isSuperAdmin()) return;
+  const users = getUsers();
+  const orders = getOrders();
+  const pending = orders.filter(o => o.status === 'pending');
+  const revenue = orders.filter(o => o.status === 'approved').reduce((s, o) => s + (o.amount || 0), 0);
+  const proCount = users.filter(u => userPlan(u.email) === 'pro').length;
+  const stats = [
+    ['👥', users.length, 'Total users'],
+    ['⚡', proCount, 'Pro members'],
+    ['🆓', users.length - proCount, 'Free members'],
+    ['⏳', pending.length, 'Pending orders'],
+    ['💰', 'Rs ' + revenue.toLocaleString(), 'Revenue (approved)'],
+    ['🧾', orders.length, 'Total orders'],
+  ];
+  const saStats = document.getElementById('saStats');
+  if (saStats) saStats.innerHTML = stats.map(([ic, n, l]) => `<div class="stat-card"><b>${ic} ${n}</b><span>${l}</span></div>`).join('');
+  const saUsers = document.getElementById('saUsers');
+  if (saUsers){
+    saUsers.innerHTML = users.length ? users.map(u => {
+      const plan = userPlan(u.email);
+      const initials = u.name.split(' ').map(w => w[0]).slice(0,2).join('').toUpperCase();
+      return `<div class="user-row">
+        <div class="avatar">${u.picture ? '' : initials}</div>
+        <div class="u-info"><b>${escapeHtml(u.name)}</b>${u.blocked ? '<span class="blocked-chip">BLOCKED</span>' : ''}<span>${escapeHtml(u.email)} · ${u.google ? 'Google account' : 'Email account'} · ${userDesignCount(u.email)} designs</span></div>
+        <span class="plan-badge ${plan === 'pro' ? 'pro' : 'free'}">${plan === 'pro' ? '⚡ PRO' : 'FREE'}</span>
+        <div class="u-btns">
+          ${plan === 'pro'
+            ? `<button class="mini-btn plain" onclick="saSetPlan('${u.email}','free')">Pro hatao (Free kar do)</button>`
+            : `<button class="mini-btn pro" onclick="saSetPlan('${u.email}','pro')">⚡ Approve — Pro kar do</button>`}
+          ${u.blocked
+            ? `<button class="mini-btn unblock" onclick="saToggleBlock('${u.email}')">✅ Unblock</button>`
+            : `<button class="mini-btn block" onclick="saToggleBlock('${u.email}')">🚫 Block</button>`}
+          ${u.email !== currentUser.email ? `<button class="mini-btn del" onclick="saDeleteUser('${u.email}')">🗑 Delete user</button>` : ''}
+        </div></div>`;
+    }).join('') : '<div class="empty-note">No users registered yet on this device.</div>';
+    // set google avatars
+    [...saUsers.querySelectorAll('.user-row')].forEach((row, i) => { const u = users[i]; const av = row.querySelector('.avatar'); if (u.picture && av){ av.style.backgroundImage = 'url(' + u.picture + ')'; av.style.backgroundSize = 'cover'; } });
+  }
+  const saPending = document.getElementById('saPending');
+  if (saPending) saPending.innerHTML = pending.length ? pending.map(o => orderCardHTML(o, true)).join('') : '<p class="muted small">No pending orders.</p>';
+  const saAll = document.getElementById('saAllOrders');
+  if (saAll) saAll.innerHTML = orders.length ? orders.map(o => orderCardHTML(o, false)).join('') : '<p class="muted small">No orders yet.</p>';
+}
+function saSetPlan(email, plan){
+  localStorage.setItem('kv_plan_' + email, plan);
+  if (currentUser && currentUser.email === email) refreshPlanUI();
+  renderSuperAdmin();
+  toast(plan === 'pro' ? '⚡ ' + email + ' is now PRO' : email + ' is now on Free plan');
+}
+function saToggleBlock(email){
+  const users = getUsers(); const u = users.find(x => x.email === email); if (!u) return;
+  u.blocked = !u.blocked; saveUsers(users); renderSuperAdmin();
+  toast(u.blocked ? '🚫 ' + email + ' blocked — ab login nahi ho sakega' : '✅ ' + email + ' unblocked');
+}
+function saDeleteUser(email){
+  if (!confirm('Delete user ' + email + ' and all their designs? This cannot be undone.')) return;
+  saveUsers(getUsers().filter(u => u.email !== email));
+  localStorage.removeItem('kv_plan_' + email);
+  localStorage.removeItem('kv_designs_' + email);
+  localStorage.removeItem('kv_brand_' + email);
+  renderSuperAdmin(); toast('🗑 User deleted: ' + email);
 }
 
 /* ================= UI helpers / init ================= */

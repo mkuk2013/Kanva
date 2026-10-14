@@ -143,6 +143,19 @@
       </div>
     </section>
 
+    <!-- PAGE: SUPER ADMIN -->
+    <section class="page" id="page-superadmin" style="display:none">
+      <div class="sec-head"><h2>👑 Super Admin Panel</h2><span class="pro-chip big-chip">OWNER ONLY</span></div>
+      <p class="muted">Yahan se tum har user ko control kar sakte ho — kisi ko bhi <b>Pro approve</b> karna, Pro hatana, block karna ya delete karna, aur Easypaisa orders approve karna.</p>
+      <div class="stat-grid" id="saStats"></div>
+      <h3 class="sub-h">👥 All Users — Approve / Pro / Block</h3>
+      <div id="saUsers"></div>
+      <h3 class="sub-h">💰 Pending Payment Orders (Easypaisa)</h3>
+      <div id="saPending"></div>
+      <h3 class="sub-h">🧾 All Orders</h3>
+      <div id="saAllOrders"></div>
+    </section>
+
     <!-- PAGE: TRASH -->
     <section class="page" id="page-trash" style="display:none">
       <div class="sec-head"><h2>Trash</h2></div>
@@ -306,7 +319,7 @@
 <script>if (!window.fabric) { document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"><\/script>'); }</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="app.js?v=3"></script>
+<script src="app.js?v=4"></script>
 <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(()=>{}); }</script>
 </body>
 </html>
