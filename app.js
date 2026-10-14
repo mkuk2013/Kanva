@@ -5,7 +5,7 @@
 const APP_NAME = 'Kanva';
 /* Google Sign-In: paste the OAuth Web Client ID (ends with .apps.googleusercontent.com).
    It is a PUBLIC identifier (not a secret) — safe in frontend code. */
-const GOOGLE_CLIENT_ID = '';
+const GOOGLE_CLIENT_ID = '1025444032477-u8clpon4uka5tuipkq7rd5vs7r137h9a.apps.googleusercontent.com';
 const EASYPAISA_NUMBER = '03363268833';
 const PRICES = { monthly: 599, yearly: 4999 };
 /* Super Admin: only these emails see the Super Admin panel and can manage users */
