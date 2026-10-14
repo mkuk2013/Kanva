@@ -1,6 +1,6 @@
 /* Kanva service worker — app shell cache for offline use */
-const CACHE = 'kanva-v1';
-const SHELL = ['./', './index.html', './style.css', './app.js', './manifest.json', './Kanva icon 192.png', './Kanva icon 512.png'];
+const CACHE = 'kanva-v2';
+const SHELL = ['./', './index.html', './style.css?v=2', './app.js?v=2', './manifest.json', './Kanva icon 192.png', './Kanva icon 512.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
 });

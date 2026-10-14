@@ -211,6 +211,7 @@ let currentSize = SIZES[0], currentDesignId = null;
 let uploads = JSON.parse(localStorage.getItem('kv_uploads') || '[]');
 
 function openEditor(sizeId, tplId){
+  if (typeof fabric === 'undefined'){ toast('⚠️ Editor library load nahi hui — internet check karke page refresh karein'); return; }
   document.getElementById('view-app').style.display = 'none';
   document.getElementById('view-auth').style.display = 'none';
   document.getElementById('view-editor').style.display = '';
