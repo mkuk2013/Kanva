@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kanva — Free Online Design Editor</title>
+<meta name="description" content="Kanva — create posts, thumbnails, logos and more. Free online design editor, website + mobile app (PWA).">
+<meta name="theme-color" content="#7c3aed">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&family=Bebas+Neue&family=Pacifico&family=Montserrat:wght@500;700;900&family=Roboto:wght@400;700&family=Oswald:wght@500;700&family=Dancing+Script:wght@700&family=Anton&family=Lobster&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<!-- ============ TOP NAV ============ -->
+<header class="topnav">
+  <div class="brand" onclick="showView('home')">
+    <div class="brand-mark">K</div>
+    <div class="brand-name">Kan<span>va</span></div>
+  </div>
+  <nav class="navlinks">
+    <a href="#" onclick="showView('home');return false;">Home</a>
+    <a href="#" onclick="openEditor();return false;">Create Design</a>
+    <a href="#" onclick="showView('home');setTimeout(()=>document.getElementById('pricing').scrollIntoView({behavior:'smooth'}),50);return false;">Pricing</a>
+    <a href="#" onclick="openMyDesigns();return false;">My Designs</a>
+    <a href="#" onclick="openAdmin();return false;" class="admin-link">Admin</a>
+  </nav>
+  <div class="nav-actions">
+    <span id="planBadge" class="plan-badge free">FREE PLAN</span>
+    <button class="btn btn-upgrade" onclick="openPricing()">⚡ Upgrade to Pro</button>
+    <button id="installBtn" class="btn btn-ghost" style="display:none" onclick="installApp()">📲 Install App</button>
+  </div>
+</header>
+
+<!-- ============ HOME VIEW ============ -->
+<main id="view-home">
+  <section class="hero">
+    <h1>Design anything.<br><span class="grad-text">Post it everywhere.</span></h1>
+    <p>Posts, stories, YouTube thumbnails, logos, posters and more — drag, drop, done.<br>Free forever plan. Pro unlocks everything.</p>
+    <div class="hero-cta">
+      <button class="btn btn-big btn-primary" onclick="openEditor()">🎨 Start Designing — It's Free</button>
+      <button class="btn btn-big btn-white" onclick="document.getElementById('templates-home').scrollIntoView({behavior:'smooth'})">Browse Templates</button>
+    </div>
+    <div class="size-row" id="sizeRow"></div>
+  </section>
+
+  <section class="section" id="templates-home">
+    <h2>Ready-made templates</h2>
+    <p class="muted">Click any template to open it in the editor and make it yours.</p>
+    <div class="tpl-grid" id="tplGridHome"></div>
+  </section>
+
+  <section class="section features">
+    <h2>Everything you need to design</h2>
+    <div class="feat-grid">
+      <div class="feat"><div class="feat-ic">🖱️</div><h3>Drag & Drop Editor</h3><p>Move, resize and rotate anything. Text, photos, shapes, stickers — full control.</p></div>
+      <div class="feat"><div class="feat-ic">📸</div><h3>Your Uploads</h3><p>Upload your own photos and logos and use them in any design.</p></div>
+      <div class="feat"><div class="feat-ic">🎨</div><h3>Colors & Gradients</h3><p>Solid colors, beautiful gradients and patterns for backgrounds and shapes.</p></div>
+      <div class="feat"><div class="feat-ic">🔤</div><h3>Stylish Fonts</h3><p>Headings, scripts, bold display fonts — with shadow, spacing and effects.</p></div>
+      <div class="feat"><div class="feat-ic">🗂️</div><h3>Layers Panel</h3><p>Reorder, lock, hide, duplicate — professional layer control.</p></div>
+      <div class="feat"><div class="feat-ic">⬇️</div><h3>PNG · JPG · PDF</h3><p>Download in seconds. Pro gets HD export with no watermark.</p></div>
+    </div>
+  </section>
+
+  <section class="section" id="pricing">
+    <h2>Simple pricing</h2>
+    <p class="muted">Pay easily with <b>Easypaisa</b> — no card needed.</p>
+    <div class="price-grid">
+      <div class="price-card">
+        <h3>Free</h3>
+        <div class="price">Rs 0 <span>/ forever</span></div>
+        <ul>
+          <li>✅ Full drag & drop editor</li>
+          <li>✅ Free templates & elements</li>
+          <li>✅ Upload your own photos/logos</li>
+          <li>✅ PNG / JPG export (standard)</li>
+          <li>✅ 5 saved projects</li>
+          <li class="off">❌ Pro templates & premium fonts</li>
+          <li class="off">❌ HD export, no watermark</li>
+          <li class="off">❌ Unlimited projects & brand kit</li>
+        </ul>
+        <button class="btn btn-white btn-block" onclick="openEditor()">Start Free</button>
+      </div>
+      <div class="price-card pro">
+        <div class="pro-tag">MOST POPULAR</div>
+        <h3>Pro ⚡</h3>
+        <div class="price">Rs 599 <span>/ month</span></div>
+        <div class="yearly">or Rs 4,999 / year — save 30%</div>
+        <ul>
+          <li>✅ Everything in Free</li>
+          <li>✅ ALL templates unlocked</li>
+          <li>✅ Premium fonts & elements</li>
+          <li>✅ HD export — no watermark</li>
+          <li>✅ Unlimited saved projects</li>
+          <li>✅ Brand kit (logo, colors, fonts)</li>
+          <li>✅ Priority new templates every week</li>
+        </ul>
+        <button class="btn btn-primary btn-block" onclick="openPayment('monthly')">Upgrade with Easypaisa</button>
+      </div>
+    </div>
+    <div class="pay-note">
+      <b>How to pay:</b> Send money to Easypaisa <b>03363268833</b> (Account Title: <b>Mukesh Kumar</b>), then submit your Transaction ID — Pro activates after quick verification.
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="brand"><div class="brand-mark">K</div><div class="brand-name">Kan<span>va</span></div></div>
+    <p>© 2026 Kanva · Made in Pakistan 🇵🇰 · Website + App (PWA) — install it on your phone from the browser menu.</p>
+  </footer>
+</main>
+
+<!-- ============ EDITOR VIEW ============ -->
+<main id="view-editor" style="display:none">
+  <div class="editor-toolbar">
+    <button class="tbtn" onclick="showView('home')" title="Back home">🏠</button>
+    <select id="sizeSelect" onchange="changeSize(this.value)" title="Canvas size"></select>
+    <button class="tbtn" onclick="undo()" title="Undo">↩️ Undo</button>
+    <button class="tbtn" onclick="redo()" title="Redo">↪️ Redo</button>
+    <span class="tsep"></span>
+    <button class="tbtn" onclick="duplicateObj()">⧉ Duplicate</button>
+    <button class="tbtn" onclick="deleteObj()">🗑️ Delete</button>
+    <button class="tbtn" onclick="bringForward()">⬆️ Forward</button>
+    <button class="tbtn" onclick="sendBackward()">⬇️ Back</button>
+    <span class="tsep"></span>
+    <button class="tbtn" onclick="zoomOut()">➖</button>
+    <span id="zoomLabel" class="zoom-label">100%</span>
+    <button class="tbtn" onclick="zoomIn()">➕</button>
+    <button class="tbtn" onclick="fitZoom()">Fit</button>
+    <span class="flex-spacer"></span>
+    <button class="tbtn" onclick="saveDesign()">💾 Save</button>
+    <button class="tbtn" onclick="openMyDesigns()">📂 My Designs</button>
+    <div class="export-wrap">
+      <button class="btn btn-primary" onclick="toggleExportMenu()">⬇️ Download ▾</button>
+      <div id="exportMenu" class="export-menu" style="display:none">
+        <button onclick="exportPNG(1)">PNG — Standard (Free)</button>
+        <button onclick="exportPNG(3)">PNG — HD 🔒 Pro</button>
+        <button onclick="exportJPG()">JPG</button>
+        <button onclick="exportPDF()">PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="editor-body">
+    <!-- left rail -->
+    <div class="rail">
+      <button class="rail-btn active" data-tab="templates" onclick="switchTab('templates')">📐<span>Templates</span></button>
+      <button class="rail-btn" data-tab="elements" onclick="switchTab('elements')">⭐<span>Elements</span></button>
+      <button class="rail-btn" data-tab="text" onclick="switchTab('text')">🔤<span>Text</span></button>
+      <button class="rail-btn" data-tab="uploads" onclick="switchTab('uploads')">📤<span>Uploads</span></button>
+      <button class="rail-btn" data-tab="background" onclick="switchTab('background')">🎨<span>BG</span></button>
+      <button class="rail-btn" data-tab="layers" onclick="switchTab('layers')">🗂️<span>Layers</span></button>
+    </div>
+
+    <!-- side panel -->
+    <aside class="sidepanel">
+      <div class="tabpage" id="tab-templates">
+        <h4>Templates</h4>
+        <div class="tpl-list" id="tplList"></div>
+      </div>
+      <div class="tabpage" id="tab-elements" style="display:none">
+        <h4>Shapes</h4>
+        <div class="el-grid" id="shapeGrid"></div>
+        <h4>Stickers</h4>
+        <div class="el-grid stickers" id="stickerGrid"></div>
+      </div>
+      <div class="tabpage" id="tab-text" style="display:none">
+        <h4>Add text</h4>
+        <button class="text-preset big" onclick="addTextPreset('heading')">Add a heading</button>
+        <button class="text-preset mid" onclick="addTextPreset('sub')">Add a subheading</button>
+        <button class="text-preset small" onclick="addTextPreset('body')">Add body text</button>
+        <h4>Font styles</h4>
+        <div id="fontStyles"></div>
+      </div>
+      <div class="tabpage" id="tab-uploads" style="display:none">
+        <h4>Uploads</h4>
+        <label class="btn btn-primary btn-block upload-label">📤 Upload photo / logo
+          <input type="file" id="uploadInput" accept="image/*" multiple hidden onchange="handleUpload(event)">
+        </label>
+        <p class="muted small">Tap an uploaded image to add it to your design.</p>
+        <div class="upload-grid" id="uploadGrid"></div>
+      </div>
+      <div class="tabpage" id="tab-background" style="display:none">
+        <h4>Background color</h4>
+        <div class="swatches" id="bgColors"></div>
+        <h4>Gradients</h4>
+        <div class="swatches gradients" id="bgGradients"></div>
+      </div>
+      <div class="tabpage" id="tab-layers" style="display:none">
+        <h4>Layers</h4>
+        <div id="layerList"></div>
+      </div>
+    </aside>
+
+    <!-- canvas stage -->
+    <section class="stage" id="stage">
+      <div class="canvas-holder" id="canvasHolder">
+        <canvas id="c"></canvas>
+      </div>
+    </section>
+
+    <!-- properties -->
+    <aside class="props" id="propsPanel">
+      <h4>Properties</h4>
+      <p class="muted small" id="noSel">Select anything on the canvas to edit its color, font, size and more.</p>
+      <div id="propControls" style="display:none">
+        <label>Fill / Text color</label>
+        <div class="prop-row"><input type="color" id="pFill" oninput="setFill(this.value)"><input type="text" id="pFillHex" readonly></div>
+        <label>Opacity <span id="opVal">100%</span></label>
+        <input type="range" id="pOpacity" min="10" max="100" value="100" oninput="setOpacity(this.value)">
+        <div id="textProps">
+          <label>Font</label>
+          <select id="pFont" onchange="setFont(this.value)"></select>
+          <label>Font size</label>
+          <input type="number" id="pFontSize" min="8" max="300" onchange="setFontSize(this.value)">
+          <div class="prop-row btns">
+            <button class="tbtn" id="btnBold" onclick="toggleBold()">B</button>
+            <button class="tbtn" id="btnItalic" onclick="toggleItalic()">I</button>
+            <button class="tbtn" id="btnUnderline" onclick="toggleUnderline()">U</button>
+            <button class="tbtn" onclick="setAlign('left')">⬅</button>
+            <button class="tbtn" onclick="setAlign('center')">⬌</button>
+            <button class="tbtn" onclick="setAlign('right')">➡</button>
+          </div>
+          <label>Shadow</label>
+          <select id="pShadow" onchange="setShadow(this.value)">
+            <option value="none">None</option><option value="soft">Soft</option>
+            <option value="hard">Hard</option><option value="glow">Glow</option>
+          </select>
+        </div>
+        <label>Outline / Stroke</label>
+        <div class="prop-row"><input type="color" id="pStroke" oninput="setStroke(this.value)">
+        <input type="number" id="pStrokeW" min="0" max="20" value="0" onchange="setStrokeW(this.value)" title="Stroke width"></div>
+      </div>
+    </aside>
+  </div>
+</main>
+
+<!-- ============ PAYMENT MODAL ============ -->
+<div class="modal-bg" id="paymentModal" style="display:none">
+  <div class="modal">
+    <button class="modal-x" onclick="closeModal('paymentModal')">✕</button>
+    <h3>⚡ Upgrade to Pro</h3>
+    <div class="pay-steps">
+      <div class="pay-step"><b>Step 1:</b> Open Easypaisa app and send <b id="payAmount">Rs 599</b> to:</div>
+      <div class="easypaisa-box">
+        <div><span>Number</span><b>03363268833</b> <button class="copy-btn" onclick="copyNumber()">Copy</button></div>
+        <div><span>Account Title</span><b>Mukesh Kumar</b></div>
+      </div>
+      <div class="pay-step"><b>Step 2:</b> Fill this form with your Transaction ID (TID).</div>
+      <form id="payForm" onsubmit="submitPayment(event)">
+        <input required id="pfName" placeholder="Your full name">
+        <input required id="pfPhone" placeholder="Your Easypaisa number (03xx-xxxxxxx)">
+        <select id="pfPlan">
+          <option value="monthly">Pro Monthly — Rs 599</option>
+          <option value="yearly">Pro Yearly — Rs 4,999 (save 30%)</option>
+        </select>
+        <input required id="pfTid" placeholder="Transaction ID (TID) from Easypaisa SMS">
+        <label class="muted small">Payment screenshot (optional but faster verification)</label>
+        <input type="file" id="pfShot" accept="image/*">
+        <button class="btn btn-primary btn-block" type="submit">✅ Submit for Verification</button>
+      </form>
+      <p class="muted small">Pro activates after verification — usually within a few hours. Your order stays saved in “My Designs → Orders”.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MY DESIGNS MODAL ============ -->
+<div class="modal-bg" id="designsModal" style="display:none">
+  <div class="modal wide">
+    <button class="modal-x" onclick="closeModal('designsModal')">✕</button>
+    <h3>📂 My Designs</h3>
+    <div id="designGrid" class="design-grid"></div>
+    <h3 style="margin-top:22px">🧾 My Pro Orders</h3>
+    <div id="orderList"></div>
+  </div>
+</div>
+
+<!-- ============ ADMIN MODAL ============ -->
+<div class="modal-bg" id="adminModal" style="display:none">
+  <div class="modal wide">
+    <button class="modal-x" onclick="closeModal('adminModal')">✕</button>
+    <h3>🛠️ Admin — Payment Orders</h3>
+    <p class="muted small">Verify the TID in your Easypaisa account, then Approve — that user's Pro note is recorded here. (In this device build, approving also unlocks Pro on this device for demo/testing.)</p>
+    <div id="adminOrders"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/fabric@5.3.1/dist/fabric.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="app.js"></script>
+<script>
+if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(()=>{}); }
+</script>
+</body>
+</html>
