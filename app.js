@@ -135,7 +135,21 @@ function getDesigns(){ return JSON.parse(localStorage.getItem(designsKey()) || '
 function saveDesigns(d){ try { localStorage.setItem(designsKey(), JSON.stringify(d)); return true; } catch(e){ toast('⚠️ Phone storage full hai — purane designs/uploads delete karke dobara save karein'); return false; } }
 function planKey(){ return 'kv_plan_' + (currentUser ? currentUser.email : 'guest'); }
 function getPlan(){ return localStorage.getItem(planKey()) || 'free'; }
-function isPro(){ return getPlan() === 'pro'; }
+/* ---- TEAM (Pro): owner adds members; members get Pro on this device ---- */
+function teamKey(){ return 'kv_team_' + (currentUser ? currentUser.email : 'guest'); }
+function getTeam(){ return JSON.parse(localStorage.getItem(teamKey()) || '[]'); }
+function saveTeam(t){ try { localStorage.setItem(teamKey(), JSON.stringify(t)); } catch(e){ toast('⚠️ Storage full hai'); } }
+function teamOwnerOf(email){
+  if (!email) return null;
+  for (let i = 0; i < localStorage.length; i++){
+    const k = localStorage.key(i);
+    if (k && k.indexOf('kv_team_') === 0){
+      try { const members = JSON.parse(localStorage.getItem(k) || '[]'); if (members.some(m => m.email === email)) return k.slice('kv_team_'.length); } catch(e){}
+    }
+  }
+  return null;
+}
+function isPro(){ return getPlan() === 'pro' || !!teamOwnerOf(currentUser ? currentUser.email : ''); }
 function getOrders(){ return JSON.parse(localStorage.getItem('kv_orders') || '[]'); }
 function brandKey(){ return 'kv_brand_' + (currentUser ? currentUser.email : 'guest'); }
 function getBrand(){ return JSON.parse(localStorage.getItem(brandKey()) || '{"colors":[],"logo":"","font":"Poppins"}'); }
@@ -161,10 +175,11 @@ function enterApp(){
 function showApp(){ document.getElementById('view-editor').style.display='none'; document.getElementById('view-app').style.display=''; renderDashboard(); }
 function goPage(p){
   document.querySelectorAll('.snav[data-page]').forEach(a => a.classList.toggle('active', a.dataset.page === p));
-  ['home','projects','templates','brand','pricing','trash','superadmin'].forEach(x => { const el = document.getElementById('page-'+x); if (el) el.style.display = x === p ? '' : 'none'; });
+  ['home','projects','templates','brand','team','pricing','trash','superadmin'].forEach(x => { const el = document.getElementById('page-'+x); if (el) el.style.display = x === p ? '' : 'none'; });
   if (p === 'projects') renderProjects();
   if (p === 'templates') renderTemplateGrids();
   if (p === 'brand') renderBrand();
+  if (p === 'team') renderTeam();
   if (p === 'trash') renderTrash();
   if (p === 'superadmin') renderSuperAdmin();
   window.scrollTo(0,0);
@@ -255,6 +270,46 @@ function addBrandColor(){ const b = getBrand(); b.colors.push(document.getElemen
 function removeBrandColor(i){ const b = getBrand(); b.colors.splice(i,1); saveBrand(b); renderBrand(); }
 function setBrandLogo(ev){ const f = ev.target.files[0]; if (!f) return; processImageFile(f, dataUrl => { const b = getBrand(); b.logo = dataUrl; saveBrand(b); renderBrand(); toast('🏷️ Brand logo saved'); }); }
 function setBrandFont(f){ const b = getBrand(); b.font = f; saveBrand(b); toast('🔤 Brand font set to ' + f); }
+
+/* ---------------- TEAM PAGE ---------------- */
+function renderTeam(){
+  const ownerPro = getPlan() === 'pro';
+  const owner = teamOwnerOf(currentUser.email);
+  const tl = document.getElementById('teamLocked'); if (tl) tl.style.display = ownerPro ? 'none' : '';
+  const tm = document.getElementById('teamMain'); if (tm) tm.style.display = ownerPro ? '' : 'none';
+  const mb = document.getElementById('teamMemberBanner');
+  if (mb){
+    if (owner && !ownerPro){ mb.style.display = ''; mb.innerHTML = '🎉 Tum <b>' + escapeHtml(owner) + '</b> ki team ke member ho — <b>Pro features tumhare liye active hain ⚡</b>'; }
+    else mb.style.display = 'none';
+  }
+  const t = getTeam();
+  const tc = document.getElementById('teamCount'); if (tc) tc.textContent = t.length + ' / 5 members';
+  if (!ownerPro) return;
+  const list = document.getElementById('teamList'); if (!list) return;
+  list.innerHTML = t.length ? t.map(m =>
+    `<div class="team-item"><div class="avatar team-av">${escapeHtml(m.name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase())}</div>
+      <div class="team-info"><b>${escapeHtml(m.name)}</b><span>${escapeHtml(m.email)} · ${escapeHtml(m.role)} · added ${escapeHtml(m.added || '')}</span></div>
+      <button class="btn btn-ghost" onclick="removeTeamMember('${m.email}')">Remove</button></div>`).join('')
+    : '<p class="muted small">Abhi koi member nahi — upar se pehla member add karein.</p>';
+}
+function addTeamMember(){
+  const name = document.getElementById('tmName').value.trim();
+  const email = document.getElementById('tmEmail').value.trim().toLowerCase();
+  const role = document.getElementById('tmRole').value;
+  if (!name || !email || email.indexOf('@') < 1){ toast('Member ka naam aur sahi email likhein'); return; }
+  if (email === currentUser.email){ toast('Apne aap ko team mein add nahi kar sakte 🙂'); return; }
+  const t = getTeam();
+  if (t.length >= 5){ toast('Team limit poori — zyada se zyada 5 members'); return; }
+  if (t.some(m => m.email === email)){ toast('Ye email pehle se team mein hai'); return; }
+  t.push({ name, email, role, added: new Date().toLocaleDateString() });
+  saveTeam(t); renderTeam();
+  document.getElementById('tmName').value = ''; document.getElementById('tmEmail').value = '';
+  toast('👥 ' + name + ' team mein add ho gaya — wo isi email se login karke Pro use kar sakta hai');
+}
+function removeTeamMember(email){
+  if (!confirm('Is member ko team se hatayein? Us ka Pro bhi band ho jayega.')) return;
+  saveTeam(getTeam().filter(m => m.email !== email)); renderTeam(); toast('Member hata diya gaya');
+}
 
 /* ================= EDITOR ================= */
 let canvas, zoom = 1, history = [], hIndex = -1, saving = false;
@@ -904,6 +959,42 @@ function openSharedDesign(json){
 
 /* ================= EXPORT ================= */
 function toggleExportMenu(){ const m = document.getElementById('exportMenu'); m.style.display = m.style.display === 'none' ? '' : 'none'; }
+/* ---- File menu (asal dropdown) ---- */
+function toggleFileMenu(e){
+  if (e) e.stopPropagation();
+  const m = document.getElementById('fileMenu'); if (!m) return;
+  m.style.display = m.style.display === 'none' ? '' : 'none';
+}
+function hideFileMenu(){ const m = document.getElementById('fileMenu'); if (m) m.style.display = 'none'; }
+function newDesign(){
+  hideFileMenu();
+  if (!confirm('Naya blank design banayein? Agar maujooda design save nahi kiya to wo chala jayega.')) return;
+  saving = true; canvas.clear(); canvas.setBackgroundColor('#ffffff', () => {});
+  saving = false; history = []; hIndex = -1; pushHistory(true);
+  currentDesignId = null; document.getElementById('docTitle').value = 'Untitled design';
+  document.getElementById('savedNote').textContent = '● Unsaved changes';
+  canvas.renderAll(); renderLayers(); toast('✨ New blank design tayyar hai');
+}
+function saveAsCopy(){
+  hideFileMenu();
+  const t = document.getElementById('docTitle');
+  t.value = (t.value.trim() || 'Untitled design') + ' copy';
+  currentDesignId = null; saveDesign(true);
+}
+function openProjectsFromEditor(){ hideFileMenu(); showApp(); goPage('projects'); }
+function clearCanvasAll(){
+  hideFileMenu();
+  if (!confirm('Canvas ki tamam cheezein saaf kar dein?')) return;
+  saving = true; canvas.clear(); canvas.setBackgroundColor('#ffffff', () => {});
+  saving = false; history = []; hIndex = -1; pushHistory(true);
+  canvas.renderAll(); renderLayers(); markUnsaved(); toast('🧹 Canvas saaf ho gaya');
+}
+document.addEventListener('click', e => {
+  const fm = document.getElementById('fileMenu');
+  if (fm && fm.style.display !== 'none' && !e.target.closest('.file-wrap')) fm.style.display = 'none';
+  const em = document.getElementById('exportMenu');
+  if (em && em.style.display !== 'none' && !e.target.closest('#exportMenu') && !e.target.closest('.btn-download')) em.style.display = 'none';
+});
 document.addEventListener('click', e => { if (!e.target.closest('#view-editor .ed-right')) { const m = document.getElementById('exportMenu'); if (m) m.style.display = 'none'; } });
 function downloadURI(uri, name){ const a = document.createElement('a'); a.href = uri; a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
 function withWatermark(fn){
