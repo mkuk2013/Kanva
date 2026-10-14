@@ -1159,9 +1159,18 @@ function installApp(){ if (deferredPrompt){ deferredPrompt.prompt(); deferredPro
 
 /* init — session restore FIRST, and each step isolated so a render
    error can never block login restore again */
-let sessionRestored = false;
-try { sessionRestored = restoreSession(); } catch(e){}
-if (!sessionRestored){ document.getElementById('view-auth').style.display = ''; }
-try { renderTemplateGrids(); } catch(e){}
-try { renderShowcase(); } catch(e){}
+(function boot(){
+  const log = [];
+  try { log.push('ls_session=' + JSON.stringify(localStorage.getItem('kv_session'))); } catch(e){ log.push('ls_err=' + e.message); }
+  try { log.push('cookie=' + (document.cookie ? 'yes' : 'no')); } catch(e){}
+  try { log.push('users=' + getUsers().length); } catch(e){ log.push('users_err=' + e.message); }
+  let sessionRestored = false;
+  try { sessionRestored = restoreSession(); log.push('restore=' + sessionRestored); }
+  catch(e){ log.push('restore_err=' + e.message); }
+  if (!sessionRestored){ document.getElementById('view-auth').style.display = ''; }
+  try { renderTemplateGrids(); } catch(e){ log.push('grids_err=' + e.message); }
+  try { renderShowcase(); } catch(e){ log.push('showcase_err=' + e.message); }
+  log.push('app=v14');
+  const bl = document.getElementById('bootLog'); if (bl) bl.textContent = log.join(' · ');
+})();
 googleWatchdog();
