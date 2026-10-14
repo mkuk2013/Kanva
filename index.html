@@ -9,7 +9,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="kanva-logo.png">
 <link rel="apple-touch-icon" href="Kanva icon 192.png">
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=5">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700&family=Bebas+Neue&family=Pacifico&family=Montserrat:wght@500;700;900&family=Roboto:wght@400;700&family=Oswald:wght@500;700&family=Dancing+Script:wght@700&family=Anton&family=Lobster&display=swap" rel="stylesheet">
 </head>
@@ -132,7 +132,7 @@
     <header class="app-top">
       <div class="search-wrap">🔍 <input id="globalSearch" placeholder="Search templates, designs…" oninput="onSearch(this.value)"></div>
       <span id="planBadge" class="plan-badge free">FREE</span>
-      <button class="btn btn-upgrade" onclick="openPayment('monthly')">⚡ Upgrade to Pro</button>
+      <button class="btn btn-upgrade" id="upgradeBtn" onclick="openPayment('monthly')">⚡ Upgrade to Pro</button>
       <button id="installBtn" class="btn btn-ghost" style="display:none" onclick="installApp()">📲 Install App</button>
       <div class="avatar small-av" id="userAvatar2">U</div>
     </header>
@@ -195,7 +195,8 @@
           <div class="pro-tag">MOST POPULAR</div>
           <h3>Pro ⚡</h3><div class="price">Rs 599 <span>/ month</span></div><div class="yearly">or Rs 4,999 / year — save 30%</div>
           <ul><li>✅ Everything in Free</li><li>✅ ALL templates unlocked</li><li>✅ Premium fonts & elements</li><li>✅ HD export — no watermark</li><li>✅ Unlimited projects</li><li>✅ Brand Kit</li></ul>
-          <button class="btn btn-primary btn-block" onclick="openPayment('monthly')">Upgrade with Easypaisa</button>
+          <button class="btn btn-primary btn-block" id="pricingUpgradeBtn" onclick="openPayment('monthly')">Upgrade with Easypaisa</button>
+          <div class="pro-active-note" id="pricingProNote" style="display:none">✅ You are on Kanva Pro — all features are unlocked. Enjoy!</div>
         </div>
       </div>
     </section>
@@ -264,9 +265,34 @@
         <button class="ctx-btn" onclick="setAlign('center')">⬌</button>
         <button class="ctx-btn" onclick="setAlign('right')">➡</button>
         <select id="pShadow" onchange="setShadow(this.value)"><option value="none">No effect</option><option value="soft">Shadow</option><option value="hard">Hard shadow</option><option value="glow">Glow</option></select>
+        <label class="ctx-lbl">Spacing <input type="range" id="pCharSp" min="0" max="400" step="10" value="0" oninput="setCharSpacing(this.value)"></label>
+        <label class="ctx-lbl">Highlight <input type="color" id="pTextBg" value="#ffff00" oninput="setTextBg(this.value)"></label>
+        <button class="ctx-btn" onclick="clearTextBg()" title="Remove highlight">✕</button>
+      </span>
+      <span id="imgCtx" style="display:none">
+        <label class="ctx-lbl">☀ <input type="range" id="fBright" min="-60" max="60" value="0" title="Brightness" oninput="setFilter('b', this.value)"></label>
+        <label class="ctx-lbl">◐ <input type="range" id="fContrast" min="-60" max="60" value="0" title="Contrast" oninput="setFilter('c', this.value)"></label>
+        <label class="ctx-lbl">🎨 <input type="range" id="fSat" min="-100" max="100" value="0" title="Saturation" oninput="setFilter('s', this.value)"></label>
+        <button class="ctx-btn" id="btnBW" onclick="setFilter('bw')">B&W</button>
+        <button class="ctx-btn" id="btnSepia" onclick="setFilter('sepia')">Sepia</button>
+        <button class="ctx-btn" onclick="resetFilters()">Reset</button>
       </span>
       <label class="ctx-lbl">Opacity <input type="range" id="pOpacity" min="10" max="100" value="100" oninput="setOpacity(this.value)"></label>
       <label class="ctx-lbl">Outline <input type="color" id="pStroke" oninput="setStroke(this.value)"> <input type="number" id="pStrokeW" min="0" max="20" value="0" onchange="setStrokeW(this.value)"></label>
+      <span class="ed-sep"></span>
+      <span class="pos-group" title="Position — page par align karein">
+        <button class="ctx-btn" onclick="alignObj('left')" title="Align left">⇤</button>
+        <button class="ctx-btn" onclick="alignObj('center')" title="Center horizontally">↔</button>
+        <button class="ctx-btn" onclick="alignObj('right')" title="Align right">⇥</button>
+        <button class="ctx-btn" onclick="alignObj('top')" title="Align top">⤒</button>
+        <button class="ctx-btn" onclick="alignObj('middle')" title="Center vertically">↕</button>
+        <button class="ctx-btn" onclick="alignObj('bottom')" title="Align bottom">⤓</button>
+      </span>
+      <button class="ctx-btn" onclick="flipObj('x')" title="Flip horizontal">⇋ Flip</button>
+      <button class="ctx-btn" onclick="flipObj('y')" title="Flip vertical">⇵</button>
+      <button class="ctx-btn" onclick="groupObjs()">🧩 Group</button>
+      <button class="ctx-btn" onclick="ungroupObj()">Ungroup</button>
+      <button class="ctx-btn" id="btnLock" onclick="toggleLock()">🔓 Lock</button>
       <span class="ed-sep"></span>
       <button class="ctx-btn" onclick="duplicateObj()">⧉ Duplicate</button>
       <button class="ctx-btn" onclick="bringForward()">⬆ Layer</button>
@@ -288,6 +314,10 @@
     <aside class="sidepanel">
       <div class="tabpage" id="tab-templates"><h4>Templates</h4><div class="tpl-list" id="tplList"></div></div>
       <div class="tabpage" id="tab-elements" style="display:none">
+        <h4>Draw — freehand</h4>
+        <button class="btn btn-ghost btn-block" id="drawBtn" onclick="toggleDraw()">✏️ Start drawing</button>
+        <div class="draw-opts"><label>Color <input type="color" id="drawColor" value="#8b3dff" oninput="drawOpt()"></label>
+        <label>Brush <input type="range" id="drawWidth" min="2" max="40" value="8" oninput="drawOpt()"></label></div>
         <h4>Shapes</h4><div class="el-grid" id="shapeGrid"></div>
         <h4>Lines & arrows</h4><div class="el-grid" id="lineGrid"></div>
         <h4>Frames & charts</h4><div class="el-grid" id="frameGrid"></div>
@@ -314,6 +344,7 @@
       <div class="tabpage" id="tab-background" style="display:none">
         <h4>Background color</h4><div class="swatches" id="bgColors"></div>
         <h4>Gradients</h4><div class="swatches gradients" id="bgGradients"></div>
+        <h4>Patterns</h4><div class="swatches" id="bgPatterns"></div>
       </div>
       <div class="tabpage" id="tab-layers" style="display:none"><h4>Layers</h4><div id="layerList"></div></div>
     </aside>
@@ -376,7 +407,7 @@
 <script>if (!window.fabric) { document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"><\/script>'); }</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="app.js?v=8"></script>
+<script src="app.js?v=9"></script>
 <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(()=>{}); }</script>
 </body>
 </html>
