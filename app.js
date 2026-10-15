@@ -1340,7 +1340,7 @@ async function saSetPlan(email, plan){
     localStorage.setItem('kv_plan_' + email, plan);
     if (currentUser && currentUser.email === email) refreshPlanUI();
   }
-  renderSuperAdmin();
+  await renderSuperAdmin();
   toast(plan === 'pro' ? '⚡ ' + email + ' is now PRO' : email + ' is now on Free plan');
 }
 async function saToggleBlock(email){
@@ -1349,7 +1349,7 @@ async function saToggleBlock(email){
   const { error } = await sb.from('profiles').update({ blocked: !u.blocked }).eq('id', u.id);
   if (error){ toast('⚠️ ' + error.message); return; }
   u.blocked = !u.blocked;
-  renderSuperAdmin();
+  await renderSuperAdmin();
   toast(u.blocked ? '🚫 ' + email + ' blocked — ab login nahi ho sakega' : '✅ ' + email + ' unblocked');
 }
 async function saDeleteUser(email){
