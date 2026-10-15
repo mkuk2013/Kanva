@@ -9,7 +9,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="kanva-logo.png">
 <link rel="apple-touch-icon" href="Kanva icon 192.png">
-<link rel="stylesheet" href="style.css?v=13">
+<link rel="stylesheet" href="style.css?v=14">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700&family=Bebas+Neue&family=Pacifico&family=Montserrat:wght@500;700;900&family=Roboto:wght@400;700&family=Oswald:wght@500;700&family=Dancing+Script:wght@700&family=Anton&family=Lobster&display=swap" rel="stylesheet">
 </head>
@@ -367,6 +367,7 @@
       <button class="rail-btn" data-tab="layers" onclick="switchTab('layers')"><img class="rail-ic" data-ic="layers" alt=""><span>Layers</span></button>
     </div>
     <aside class="sidepanel">
+      <button class="panel-close" onclick="closePanel()" title="Close panel">✕</button>
       <div class="tabpage" id="tab-templates"><h4>Templates</h4><div class="tpl-list" id="tplList"></div></div>
       <div class="tabpage" id="tab-elements" style="display:none">
         <h4>Draw — freehand</h4>
@@ -466,7 +467,7 @@
 <script src="icons1.js?v=3"></script>
 <script src="icons2.js?v=3"></script>
 <script src="icons3.js?v=3"></script>
-<script src="app.js?v=25"></script>
+<script src="app.js?v=26"></script>
 <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(()=>{}); }</script>
 </body>
 </html>
