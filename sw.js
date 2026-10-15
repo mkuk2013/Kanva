@@ -1,6 +1,6 @@
 /* Kanva service worker — network-first for pages (fixes always land), cache-first for assets */
-const CACHE = 'kanva-v29';
-const SHELL = ['./', './index.html', './style.css?v=12', './icons1.js?v=2', './icons2.js?v=2', './icons3.js?v=2', './app.js?v=24', './manifest.json', './kanva-logo.png', './Kanva icon 192.png', './Kanva icon 512.png'];
+const CACHE = 'kanva-v30';
+const SHELL = ['./', './index.html', './style.css?v=13', './icons1.js?v=3', './icons2.js?v=3', './icons3.js?v=3', './app.js?v=25', './manifest.json', './kanva-logo.png', './Kanva icon 192.png', './Kanva icon 512.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
 });

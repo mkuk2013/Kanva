@@ -82,7 +82,7 @@ button{cursor:pointer;font-family:inherit}
 
 /* ---------- APP SHELL ---------- */
 #view-app{display:flex;min-height:100vh}
-.sidebar{width:236px;background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;padding:16px 12px;position:sticky;top:0;height:100vh;flex:none}
+.sidebar{width:236px;background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;padding:16px 12px;position:sticky;top:0;height:100vh;height:100dvh;flex:none;overflow-y:auto}
 .side-brand{display:flex;align-items:center;gap:10px;font-family:Poppins;font-weight:800;font-size:21px;padding:2px 6px 14px}
 .side-brand span{background:linear-gradient(120deg,#8b3dff,#00c4cc);-webkit-background-clip:text;background-clip:text;color:transparent}
 .create-btn{background:var(--purple);color:#fff;border:none;border-radius:10px;padding:12px;font-size:15px;font-weight:700;margin-bottom:8px}
@@ -351,3 +351,47 @@ button{cursor:pointer;font-family:inherit}
 .cm-ic{width:21px;height:21px;border-radius:6px;vertical-align:-6px;margin-right:8px}
 
 .lp-card-ic img{width:32px;height:32px;border-radius:10px;display:block}
+
+/* ============ CANVA LOOK PASS (2026-10-16) ============ */
+.tpl-card{background:#fff;border:1px solid #e8e9f1;border-radius:14px;overflow:hidden;cursor:pointer;position:relative;box-shadow:0 1px 3px rgba(23,10,60,.06);transition:.15s;color:#20222a;display:block;padding:0;text-align:left}
+.tpl-card:hover{transform:translateY(-3px);box-shadow:0 14px 30px rgba(30,10,80,.16)}
+.tpl-card .tpl-img{aspect-ratio:1/.92;background-size:cover;background-position:center;position:relative}
+.tpl-card .tpl-meta{padding:9px 12px 12px}
+.tpl-card .tpl-title{font-family:Poppins;font-weight:600;font-size:14px;color:#20222a;text-shadow:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tpl-card .tpl-sub{font-size:11.5px;color:#7a8194;opacity:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ed-topbar{background:#fff;color:#23242a;border-bottom:1px solid #e6e7ee;box-shadow:0 1px 5px rgba(23,10,60,.05)}
+.ed-topbar .ed-menu{color:#2b2d33}
+.ed-topbar .ed-menu:hover{background:#f1f2f7}
+.ed-topbar .ed-icon{color:#3a3d45}
+.ed-topbar .ed-icon:hover{background:#f1f2f7}
+.ed-topbar .doc-title{color:#22242a}
+.ed-topbar .saved-note{color:#79808f}
+.ed-topbar .ed-sep{background:#e3e5ec}
+.ed-topbar .btn-white{background:#f1f2f6;color:#26282e;border:1px solid #e2e4ec;box-shadow:none}
+.ed-topbar .btn-download{background:linear-gradient(120deg,#8b3dff,#6d28d9);color:#fff;border:none}
+.side-nav .snav.active{background:#f0eafe;color:#5b2ee5}
+.rail-btn.active{color:#5b2ee5;background:#f0eafe}
+
+
+/* ---- account / profile + logout ---- */
+.side-user .avatar,.side-user .su-info{cursor:pointer}
+.logout-btn{display:flex;align-items:center;gap:7px;background:none;border:none;color:#d43a3a;font-size:13px;font-weight:600;padding:8px 9px;border-radius:9px;cursor:pointer;margin-left:auto}
+.logout-btn:hover{background:#fdecec}
+.logout-btn .nav-ic{width:19px;height:19px}
+.account-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:22px;display:flex;gap:22px;max-width:560px;box-shadow:0 2px 10px rgba(23,10,60,.05)}
+.big-av{width:84px;height:84px;font-size:32px;flex:none}
+.acc-fields{flex:1;display:flex;flex-direction:column;gap:7px;min-width:0}
+.acc-fields label{font-size:12px;font-weight:700;color:var(--muted);margin-top:6px}
+.acc-input{border:1.5px solid var(--line);border-radius:10px;padding:11px 13px;font-size:14.5px;font-family:Inter;background:#fbfbfe}
+.acc-input[readonly]{background:#f3f4f8;color:#666}
+.acc-plan-row{display:flex;align-items:center;gap:10px}
+.small-btn{padding:8px 13px;font-size:12.5px}
+.acc-meta{font-size:12.5px;color:var(--muted);margin-top:8px}
+.acc-actions{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+.btn-logout{background:#fdecec;color:#c22f2f;border:1px solid #f5c6c6}
+@media (max-width:900px){
+  .side-user{flex-direction:column;gap:9px}
+  .logout-btn{margin-left:0;padding:7px}
+  .account-card{flex-direction:column;align-items:center;text-align:left}
+  .acc-fields{width:100%}
+}

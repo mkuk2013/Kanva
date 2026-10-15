@@ -9,7 +9,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="kanva-logo.png">
 <link rel="apple-touch-icon" href="Kanva icon 192.png">
-<link rel="stylesheet" href="style.css?v=12">
+<link rel="stylesheet" href="style.css?v=13">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700&family=Bebas+Neue&family=Pacifico&family=Montserrat:wght@500;700;900&family=Roboto:wght@400;700&family=Oswald:wght@500;700&family=Dancing+Script:wght@700&family=Anton&family=Lobster&display=swap" rel="stylesheet">
 </head>
@@ -126,9 +126,9 @@
       <a class="snav" data-page="trash" onclick="goPage('trash')"><img class="nav-ic" data-ic="trash" alt=""><span class="sn-txt">Trash</span></a>
     </nav>
     <div class="side-user">
-      <div class="avatar" id="userAvatar">U</div>
-      <div class="su-info"><b id="userName">User</b><span id="userPlan">Free plan</span></div>
-      <button class="icon-btn" title="Log out" onclick="logout()">⏻</button>
+      <div class="avatar" id="userAvatar" title="My profile" onclick="goPage('account')">U</div>
+      <div class="su-info" title="My profile" onclick="goPage('account')"><b id="userName">User</b><span id="userPlan">Free plan</span></div>
+      <button class="logout-btn" title="Log out" onclick="logout()"><img class="nav-ic" data-ic="logout" alt=""><span class="sn-txt">Log out</span></button>
     </div>
   </aside>
 
@@ -139,7 +139,7 @@
       <span id="planBadge" class="plan-badge free">FREE</span>
       <button class="btn btn-upgrade" id="upgradeBtn" onclick="openPayment('monthly')"><img class="cm-ic" data-ic="plans" alt="">Upgrade to Pro</button>
       <button id="installBtn" class="btn btn-ghost" style="display:none" onclick="installApp()">📲 Install App</button>
-      <div class="avatar small-av" id="userAvatar2">U</div>
+      <div class="avatar small-av" id="userAvatar2" title="My profile" onclick="goPage('account')">U</div>
     </header>
 
     <!-- PAGE: HOME -->
@@ -241,6 +241,26 @@
       <div class="sec-head"><h2>Trash</h2></div>
       <div class="design-grid" id="trashGrid"></div>
     </section>
+
+    <section class="page" id="page-account" style="display:none">
+      <div class="sec-head"><h2>My Profile</h2></div>
+      <div class="account-card">
+        <div class="avatar big-av" id="accAvatar">U</div>
+        <div class="acc-fields">
+          <label>Display name</label>
+          <input id="accName" class="acc-input" placeholder="Your name">
+          <label>Email</label>
+          <input id="accEmail" class="acc-input" readonly>
+          <label>Plan</label>
+          <div class="acc-plan-row"><span id="accPlan" class="plan-badge free">FREE</span><button class="btn small-btn" onclick="goPage('pricing')">Plans &amp; Pricing</button></div>
+          <p class="acc-meta" id="accMeta"></p>
+          <div class="acc-actions">
+            <button class="btn btn-primary" onclick="saveProfileName()">Save name</button>
+            <button class="btn btn-logout" onclick="logout()"><img class="cm-ic" data-ic="logout" alt="">Log out</button>
+          </div>
+        </div>
+      </div>
+    </section>
   </div>
 </div>
 
@@ -273,7 +293,7 @@
     <input id="docTitle" class="doc-title" value="Untitled design" onchange="docTitleChanged()">
     <div class="ed-right">
       <span id="planBadge2" class="plan-badge free">FREE</span>
-      <div class="avatar small-av" id="userAvatar3">U</div>
+      <div class="avatar small-av" id="userAvatar3" title="My profile" onclick="showApp();goPage('account')">U</div>
       <button class="btn btn-white" onclick="openShare()"><img class="cm-ic" data-ic="share" alt="">Share</button>
       <button class="btn btn-download" onclick="toggleExportMenu()"><img class="cm-ic" data-ic="download" alt="">Download</button>
       <div id="exportMenu" class="export-menu" style="display:none">
@@ -443,10 +463,10 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="icons1.js?v=2"></script>
-<script src="icons2.js?v=2"></script>
-<script src="icons3.js?v=2"></script>
-<script src="app.js?v=24"></script>
+<script src="icons1.js?v=3"></script>
+<script src="icons2.js?v=3"></script>
+<script src="icons3.js?v=3"></script>
+<script src="app.js?v=25"></script>
 <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(()=>{}); }</script>
 </body>
 </html>
