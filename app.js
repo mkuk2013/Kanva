@@ -23,12 +23,27 @@ const SIZES = [
 ];
 const FONTS = ['Poppins','Inter','Montserrat','Roboto','Oswald','Bebas Neue','Playfair Display','Pacifico','Dancing Script','Anton','Lobster','Arial','Georgia','Verdana','Courier New'];
 
-/* ---------------- AUTH ---------------- */
+/* ---------------- AUTH (Supabase cloud — v3) ----------------
+   Accounts/designs/plans/teams/orders live in Supabase Postgres.
+   localStorage remains only for the local Demo account + offline cache. */
+const SB_URL = 'https://tjwgwdupwytiaocbmzvz.supabase.co';
+const SB_KEY = 'sb_publishable_y183kF6ySPvUQzEWtmroLw__d-QCFvW';
+let sb = null;
+try { sb = window.supabase ? window.supabase.createClient(SB_URL, SB_KEY) : null; } catch(e){ sb = null; }
+
 let authMode = 'login';
-let currentUser = null;
-function hashPw(s){ let h = 5381; for (let i=0;i<s.length;i++) h = ((h<<5)+h+s.charCodeAt(i))>>>0; return 'h'+h.toString(16); }
-function getUsers(){ return JSON.parse(localStorage.getItem('kv_users') || '[]'); }
-function saveUsers(u){ localStorage.setItem('kv_users', JSON.stringify(u)); }
+let currentUser = null;        // { name, email, picture, demo? }
+let cloudUser = null;          // Supabase auth user (null = local/demo mode)
+let profileRow = null;         // profiles row: plan + blocked
+let designsCache = null;       // cloud designs (UI shape), live array
+let teamCache = null;          // my team members (UI shape)
+let memberOfOwner = null;      // owner email if I am a team member (Pro via team)
+let brandCache = null;         // my brand kit object
+let myOrdersCache = [];        // my Easypaisa orders
+const designFp = {};           // design id -> fingerprint (diff sync)
+const teamFp = {};             // member email -> fingerprint
+function isCloud(){ return !!cloudUser; }
+
 function toggleAuthMode(e){
   if (e) e.preventDefault();
   authMode = authMode === 'login' ? 'signup' : 'login';
@@ -39,57 +54,139 @@ function toggleAuthMode(e){
   document.getElementById('authSwitchLink').textContent = authMode === 'signup' ? 'Log in' : 'Sign up free';
   document.getElementById('authErr').textContent = '';
 }
-function handleAuth(e){
+
+async function handleAuth(e){
   e.preventDefault();
   const email = document.getElementById('auEmail').value.trim().toLowerCase();
   const pass = document.getElementById('auPassword').value;
   const name = document.getElementById('auName').value.trim();
   const err = document.getElementById('authErr');
-  const users = getUsers();
-  if (authMode === 'signup'){
-    if (!name){ err.textContent = 'Please enter your full name.'; return; }
-    if (users.find(u => u.email === email)){ err.textContent = 'Account already exists — please log in.'; return; }
-    const u = { name, email, pass: hashPw(pass), created: Date.now() };
-    users.push(u); saveUsers(users); startSession(u);
-    toast('🎉 Welcome to Kanva, ' + name.split(' ')[0] + '!');
-  } else {
-    const u = users.find(u => u.email === email);
-    if (!u){ err.textContent = 'No account with this email. Please sign up first.'; authMode='login'; toggleAuthMode(); authMode='signup'; document.getElementById('auEmail').value=email; return; }
-    if (u.blocked){ err.textContent = 'Your account has been blocked by the admin. Please contact support.'; return; }
-    if (u.google && u.pass === 'google'){ err.textContent = 'This account uses Google sign-in — please use the "Continue with Google" button.'; return; }
-    if (u.pass !== hashPw(pass)){ err.textContent = 'Incorrect password. Please try again.'; return; }
-    startSession(u); toast('👋 Welcome back, ' + u.name.split(' ')[0] + '!');
-  }
+  err.textContent = '';
+  if (!sb){ err.textContent = 'Server se rabta nahi ho pa raha — internet check karke page refresh karein.'; return; }
+  const btn = document.getElementById('authSubmit');
+  const oldLbl = btn.textContent; btn.textContent = 'Please wait…'; btn.disabled = true;
+  try {
+    if (authMode === 'signup'){
+      if (!name){ err.textContent = 'Please enter your full name.'; return; }
+      const { data, error } = await sb.auth.signUp({ email, password: pass, options: { data: { full_name: name } } });
+      if (error){ err.textContent = error.message; return; }
+      if (data.session){ const ok = await afterAuth(data.user); if (ok) toast('🎉 Welcome to Kanva, ' + name.split(' ')[0] + '!'); }
+      else { err.textContent = '✅ Account ban gaya! Apni email par aye hue confirmation link par click karein, phir yahan login karein.'; if (authMode === 'signup') toggleAuthMode(); }
+    } else {
+      const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+      if (error){ err.textContent = error.message === 'Invalid login credentials' ? 'Email ya password ghalat hai. Dobara try karein, ya Sign up karein agar account nahi hai.' : error.message; return; }
+      const ok = await afterAuth(data.user);
+      if (ok) toast('👋 Welcome back, ' + currentUser.name.split(' ')[0] + '!');
+    }
+  } catch(ex){ err.textContent = 'Kuch ghalat ho gaya — dobara try karein.'; }
+  finally { btn.textContent = oldLbl; btn.disabled = false; }
 }
+
+/* After a successful Supabase auth: load profile + all cloud data, then enter the app. */
+async function afterAuth(user, silent){
+  cloudUser = user;
+  const email = (user.email || '').toLowerCase();
+  let prof = null;
+  try {
+    const r = await sb.from('profiles').select('*').eq('id', user.id).maybeSingle();
+    prof = r.data;
+  } catch(e){}
+  if (!prof){
+    const meta = user.user_metadata || {};
+    const ins = { id: user.id, email, name: meta.full_name || meta.name || email.split('@')[0], picture: meta.avatar_url || meta.picture || '' };
+    try { const r2 = await sb.from('profiles').insert(ins).select().maybeSingle(); prof = r2.data || ins; }
+    catch(e){ prof = ins; }
+  }
+  profileRow = prof;
+  if (prof && prof.blocked){
+    try { await sb.auth.signOut(); } catch(e){}
+    cloudUser = null; profileRow = null;
+    toast('🚫 Ye account admin ne block kar diya hai. Please contact support.');
+    document.getElementById('view-auth').style.display = '';
+    return false;
+  }
+  currentUser = { name: (prof && prof.name) || email.split('@')[0], email, picture: (prof && prof.picture) || '' };
+  await loadCloudData();
+  enterApp();
+  if (pendingTpl){ const _pt = pendingTpl; pendingTpl = null; setTimeout(() => openTpl(_pt), 450); }
+  const shared = parseShareHash();
+  if (shared) openSharedDesign(shared);
+  return true;
+}
+
+function rowToDesign(r){
+  const d = r.data || {};
+  return { id: r.id, name: r.name, sizeId: r.size_id, sizeName: r.size_name, sizeW: r.size_w, sizeH: r.size_h,
+           json: d.json, bg: d.bg, thumb: d.thumb, trashed: !!r.trashed,
+           updated: r.updated_at ? new Date(r.updated_at).toLocaleString() : '' };
+}
+function fingerprintOf(d){
+  return [d.name, d.trashed ? 1 : 0, (d.json || '').length, (d.thumb || '').length, d.bg || '', d.sizeW || 0, d.sizeH || 0, d.sizeId || ''].join('|');
+}
+async function loadCloudData(){
+  try {
+    const [dz, tOwn, tMem, bk, ord] = await Promise.all([
+      sb.from('designs').select('*').eq('user_id', cloudUser.id).order('updated_at', { ascending: false }),
+      sb.from('teams').select('*').eq('owner_id', cloudUser.id),
+      sb.from('teams').select('*').eq('member_email', currentUser.email),
+      sb.from('brand_kits').select('*').eq('user_id', cloudUser.id).maybeSingle(),
+      sb.from('orders').select('*').eq('user_id', cloudUser.id).order('created_at', { ascending: false })
+    ]);
+    designsCache = (dz.data || []).map(rowToDesign);
+    Object.keys(designFp).forEach(k => delete designFp[k]);
+    designsCache.forEach(d => { designFp[d.id] = fingerprintOf(d); });
+    teamCache = (tOwn.data || []).map(r => ({ name: r.member_name || '', email: r.member_email, role: r.role || 'Editor' }));
+    Object.keys(teamFp).forEach(k => delete teamFp[k]);
+    teamCache.forEach(m => { teamFp[m.email] = [m.name, m.role].join('|'); });
+    memberOfOwner = (tMem.data && tMem.data.length) ? tMem.data[0].owner_email : null;
+    brandCache = (bk.data && bk.data.data) ? bk.data.data : null;
+    myOrdersCache = ord.data || [];
+  } catch(e){ designsCache = designsCache || []; teamCache = teamCache || []; }
+  await migrateLocalDesigns();
+}
+/* One-time: upload this device's old (v2) local designs to the cloud. */
+async function migrateLocalDesigns(){
+  try {
+    if (!designsCache || designsCache.length) return;
+    const key = 'kv_designs_' + currentUser.email;
+    const local = JSON.parse(localStorage.getItem(key) || '[]');
+    if (!local.length || localStorage.getItem('kv_migrated3_' + currentUser.email)) return;
+    const rows = local.map(d => ({ id: d.id, user_id: cloudUser.id, name: d.name, size_id: d.sizeId, size_name: d.sizeName,
+      size_w: d.sizeW, size_h: d.sizeH, data: { json: d.json, bg: d.bg, thumb: d.thumb }, trashed: !!d.trashed }));
+    const { error } = await sb.from('designs').insert(rows);
+    if (!error){
+      designsCache = local.slice();
+      designsCache.forEach(d => { designFp[d.id] = fingerprintOf(d); });
+      localStorage.setItem('kv_migrated3_' + currentUser.email, '1');
+    }
+  } catch(e){}
+}
+
 function demoLogin(){
-  const users = getUsers();
-  let u = users.find(x => x.email === 'demo@kanva.app');
-  if (!u){ u = { name:'Demo User', email:'demo@kanva.app', pass: hashPw('demo123'), created: Date.now() }; users.push(u); saveUsers(users); }
-  startSession(u); toast('⚡ Logged in with Demo Account');
+  cloudUser = null; profileRow = null; designsCache = null; teamCache = null; brandCache = null; memberOfOwner = null; myOrdersCache = [];
+  currentUser = { name: 'Demo User', email: 'demo@kanva.app', picture: '', demo: true };
+  enterApp();
+  toast('⚡ Logged in with Demo Account');
+  if (pendingTpl){ const _pt = pendingTpl; pendingTpl = null; setTimeout(() => openTpl(_pt), 450); }
+  const shared = parseShareHash();
+  if (shared) openSharedDesign(shared);
 }
 function googleNotice(){
   toast('⚠️ Google ka button load nahi ho saka — page refresh karke dobara try karein, ya email/Demo se login karein');
 }
-/* ---------- Google Sign-In (Gmail) ---------- */
+/* ---------- Google Sign-In (via Supabase Auth) ---------- */
 function decodeJwt(token){
   const part = token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
   const json = decodeURIComponent(atob(part).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
   return JSON.parse(json);
 }
-function handleGoogleCredential(resp){
+async function handleGoogleCredential(resp){
+  if (!sb){ googleNotice(); return; }
   try {
-    const p = decodeJwt(resp.credential);
-    if (!p || !p.email){ toast('Google login failed — please try again'); return; }
-    const email = p.email.toLowerCase();
-    const users = getUsers();
-    let u = users.find(x => x.email === email);
-    if (!u){
-      u = { name: p.name || email.split('@')[0], email, pass: 'google', google: true, picture: p.picture || '', created: Date.now() };
-      users.push(u);
-    } else { u.google = true; if (p.picture) u.picture = p.picture; if (p.name) u.name = p.name; }
-    if (u.blocked){ toast('🚫 This account has been blocked by the admin.'); return; }
-    saveUsers(users); startSession(u);
-    toast('🎉 Welcome, ' + u.name.split(' ')[0] + ' — signed in with Google');
+    const { data, error } = await sb.auth.signInWithIdToken({ provider: 'google', token: resp.credential });
+    if (error || !data || !data.user){ toast('Google login ka setup abhi mukammal ho raha hai — filhal email ya Demo se login karein'); return; }
+    const ok = await afterAuth(data.user);
+    if (ok) toast('🎉 Welcome, ' + currentUser.name.split(' ')[0] + ' — signed in with Google');
   } catch(e){ toast('Google login failed — please try again'); }
 }
 /* Google button is rendered declaratively by the GIS library itself
@@ -102,66 +199,131 @@ function googleWatchdog(){
     if (fb && (!zone || !zone.querySelector('iframe'))) fb.style.display = '';
   }, 5000);
 }
-function startSession(u){
-  currentUser = { name: u.name, email: u.email, picture: u.picture || '' };
-  localStorage.setItem('kv_session', u.email);
-  try { document.cookie = 'kv_session=' + encodeURIComponent(u.email) + '; max-age=' + (30*24*3600) + '; path=/; SameSite=Lax'; } catch(e){}
-  enterApp();
-  if (pendingTpl){ const _pt = pendingTpl; pendingTpl = null; setTimeout(() => openTpl(_pt), 450); }
-  const shared = parseShareHash();
-  if (shared) openSharedDesign(shared);
-}
-function logout(){
-  localStorage.removeItem('kv_session'); currentUser = null;
+async function logout(){
+  try { if (sb && cloudUser) await sb.auth.signOut(); } catch(e){}
+  cloudUser = null; profileRow = null; currentUser = null;
+  designsCache = null; teamCache = null; brandCache = null; memberOfOwner = null; myOrdersCache = [];
+  localStorage.removeItem('kv_session');
   try { document.cookie = 'kv_session=; max-age=0; path=/'; } catch(e){}
   document.getElementById('view-app').style.display = 'none';
   document.getElementById('view-editor').style.display = 'none';
   document.getElementById('view-auth').style.display = '';
 }
-function sessionEmail(){
-  const ls = localStorage.getItem('kv_session'); if (ls) return ls;
-  try { const m = document.cookie.match(/(?:^|; )kv_session=([^;]*)/); if (m) return decodeURIComponent(m[1]); } catch(e){}
-  return null;
+async function restoreCloudSession(){
+  if (!sb) return false;
+  try {
+    const { data } = await sb.auth.getSession();
+    if (data && data.session && data.session.user) return await afterAuth(data.session.user, true);
+  } catch(e){}
+  return false;
 }
-function restoreSession(){
-  const email = sessionEmail();
-  if (!email) return false;
-  const u = getUsers().find(x => x.email === email);
-  if (!u) return false;
-  localStorage.setItem('kv_session', email);
-  if (u.blocked){ localStorage.removeItem('kv_session'); return false; }
-  currentUser = { name: u.name, email: u.email, picture: u.picture || '' };
-  enterApp();
-  const shared = parseShareHash();
-  if (shared) openSharedDesign(shared);
-  return true;
+if (sb && sb.auth && sb.auth.onAuthStateChange){
+  sb.auth.onAuthStateChange((ev) => {
+    if (ev === 'SIGNED_OUT' && currentUser && !currentUser.demo){
+      currentUser = null; cloudUser = null;
+      document.getElementById('view-app').style.display = 'none';
+      document.getElementById('view-editor').style.display = 'none';
+      document.getElementById('view-auth').style.display = '';
+    }
+  });
 }
 
-/* ---------------- PER-USER STORAGE ---------------- */
+/* ---------------- PER-USER STORAGE (cloud-aware) ---------------- */
 function designsKey(){ return 'kv_designs_' + (currentUser ? currentUser.email : 'guest'); }
-function getDesigns(){ return JSON.parse(localStorage.getItem(designsKey()) || '[]'); }
-function saveDesigns(d){ try { localStorage.setItem(designsKey(), JSON.stringify(d)); return true; } catch(e){ toast('⚠️ Phone storage full hai — purane designs/uploads delete karke dobara save karein'); return false; } }
-function planKey(){ return 'kv_plan_' + (currentUser ? currentUser.email : 'guest'); }
-function getPlan(){ return localStorage.getItem(planKey()) || 'free'; }
-/* ---- TEAM (Pro): owner adds members; members get Pro on this device ---- */
-function teamKey(){ return 'kv_team_' + (currentUser ? currentUser.email : 'guest'); }
-function getTeam(){ return JSON.parse(localStorage.getItem(teamKey()) || '[]'); }
-function saveTeam(t){ try { localStorage.setItem(teamKey(), JSON.stringify(t)); } catch(e){ toast('⚠️ Storage full hai'); } }
-function teamOwnerOf(email){
-  if (!email) return null;
-  for (let i = 0; i < localStorage.length; i++){
-    const k = localStorage.key(i);
-    if (k && k.indexOf('kv_team_') === 0){
-      try { const members = JSON.parse(localStorage.getItem(k) || '[]'); if (members.some(m => m.email === email)) return k.slice('kv_team_'.length); } catch(e){}
+function getDesigns(){
+  if (isCloud()) return designsCache || [];
+  return JSON.parse(localStorage.getItem(designsKey()) || '[]');
+}
+function saveDesigns(d){
+  if (isCloud()){ designsCache = d; syncDesigns(); return true; }
+  try { localStorage.setItem(designsKey(), JSON.stringify(d)); return true; }
+  catch(e){ toast('⚠️ Phone storage full hai — purane designs/uploads delete karke dobara save karein'); return false; }
+}
+/* Diff-sync the in-memory design list to Supabase (only changed rows are written). */
+async function syncDesigns(){
+  if (!isCloud() || !designsCache) return;
+  const seen = {};
+  for (const d of designsCache){
+    seen[d.id] = true;
+    const fp = fingerprintOf(d);
+    if (designFp[d.id] !== fp){
+      designFp[d.id] = fp;
+      try {
+        await sb.from('designs').upsert({ id: d.id, user_id: cloudUser.id, name: d.name, size_id: d.sizeId, size_name: d.sizeName,
+          size_w: d.sizeW, size_h: d.sizeH, data: { json: d.json, bg: d.bg, thumb: d.thumb }, trashed: !!d.trashed,
+          updated_at: new Date().toISOString() }, { onConflict: 'id' });
+      } catch(e){}
     }
   }
+  for (const id of Object.keys(designFp)){
+    if (!seen[id]){ delete designFp[id]; try { await sb.from('designs').delete().eq('id', id); } catch(e){} }
+  }
+}
+function planKey(){ return 'kv_plan_' + (currentUser ? currentUser.email : 'guest'); }
+function getPlan(){
+  if (isCloud()) return (profileRow && profileRow.plan) || 'free';
+  return localStorage.getItem(planKey()) || 'free';
+}
+function teamKey(){ return 'kv_team_' + (currentUser ? currentUser.email : 'guest'); }
+function getTeam(){
+  if (isCloud()) return teamCache || [];
+  return JSON.parse(localStorage.getItem(teamKey()) || '[]');
+}
+function saveTeam(t){
+  if (isCloud()){ teamCache = t; syncTeam(); return; }
+  try { localStorage.setItem(teamKey(), JSON.stringify(t)); } catch(e){ toast('⚠️ Storage full hai'); }
+}
+async function syncTeam(){
+  if (!isCloud() || !teamCache) return;
+  const seen = {};
+  for (const m of teamCache){
+    seen[m.email] = true;
+    const fp = [m.name, m.role].join('|');
+    if (teamFp[m.email] !== fp){
+      teamFp[m.email] = fp;
+      try { await sb.from('teams').upsert({ owner_id: cloudUser.id, owner_email: currentUser.email, member_email: m.email, member_name: m.name, role: m.role }, { onConflict: 'owner_id,member_email' }); } catch(e){}
+    }
+  }
+  for (const em of Object.keys(teamFp)){
+    if (!seen[em]){ delete teamFp[em]; try { await sb.from('teams').delete().eq('owner_id', cloudUser.id).eq('member_email', em); } catch(e){} }
+  }
+}
+function teamOwnerOf(email){
+  if (isCloud()) return (currentUser && email === currentUser.email) ? memberOfOwner : null;
+  if (!email) return null;
+  try {
+    for (let i = 0; i < localStorage.length; i++){
+      const k = localStorage.key(i);
+      if (k && k.indexOf('kv_team_') === 0){
+        const members = JSON.parse(localStorage.getItem(k) || '[]');
+        if (members.some(m => m.email === email)) return k.slice('kv_team_'.length);
+      }
+    }
+  } catch(e){}
   return null;
 }
 function isPro(){ return getPlan() === 'pro' || !!teamOwnerOf(currentUser ? currentUser.email : ''); }
-function getOrders(){ return JSON.parse(localStorage.getItem('kv_orders') || '[]'); }
+function getOrders(){
+  if (isCloud()) return (myOrdersCache || []).map(r => ({ id: r.id, email: r.email, name: '', phone: '', plan: r.plan, amount: r.amount, tid: r.tid, status: r.status, date: r.created_at ? new Date(r.created_at).toLocaleString() : '', shot: r.screenshot || '' }));
+  return JSON.parse(localStorage.getItem('kv_orders') || '[]');
+}
 function brandKey(){ return 'kv_brand_' + (currentUser ? currentUser.email : 'guest'); }
-function getBrand(){ return JSON.parse(localStorage.getItem(brandKey()) || '{"colors":[],"logo":"","font":"Poppins"}'); }
-function saveBrand(b){ localStorage.setItem(brandKey(), JSON.stringify(b)); }
+function getBrand(){
+  if (isCloud()){
+    if (!brandCache) brandCache = { colors: [], logo: '', font: 'Poppins' };
+    return brandCache;
+  }
+  return JSON.parse(localStorage.getItem(brandKey()) || '{"colors":[],"logo":"","font":"Poppins"}');
+}
+function saveBrand(b){
+  if (isCloud()){
+    brandCache = b;
+    sb.from('brand_kits').upsert({ user_id: cloudUser.id, data: b }, { onConflict: 'user_id' })
+      .then(({ error }) => { if (error) toast('⚠️ Brand kit save nahi ho saka — internet check karein'); });
+    return;
+  }
+  localStorage.setItem(brandKey(), JSON.stringify(b));
+}
 function requirePro(feature){ if (isPro()) return true; toast('🔒 ' + feature + ' is a Pro feature'); openPayment('monthly'); return false; }
 
 /* ---------------- APP SHELL ---------------- */
@@ -204,7 +366,7 @@ function refreshPlanUI(){
 function renderDashboard(){
   document.getElementById('typeRow').innerHTML = SIZES.map(s =>
     `<button class="type-item" onclick="openEditor('${s.id}')"><span class="type-ic"><img src="${KV_ICONS[s.icon]}" alt=""></span>${s.name}</button>`).join('') +
-    `<button class="type-item" onclick="customSize()"><span class="type-ic">✂️</span>Custom size</button>`;
+    `<button class="type-item" onclick="customSize()"><span class="type-ic"><img src="${KV_ICONS.custom}" alt=""></span>Custom size</button>`;
   document.getElementById('createMenu').innerHTML = SIZES.map(s =>
     `<button onclick="openEditor('${s.id}')"><img class="cm-ic" src="${KV_ICONS[s.icon]}" alt="">${s.name} <small>${s.w} × ${s.h} px</small></button>`).join('') +
     `<button onclick="customSize()"><img class="cm-ic" src="' + KV_ICONS.custom + '" alt="">Custom size</button>`;
@@ -942,7 +1104,7 @@ function saveDesign(manual){
     const rec = { id: Date.now(), name: title, sizeId: currentSize.id, sizeName: currentSize.name, sizeW: currentSize.w, sizeH: currentSize.h, updated: new Date().toLocaleString(), trashed:false, ...snap };
     ds.unshift(rec); saveDesigns(ds); currentDesignId = rec.id;
   }
-  document.getElementById('savedNote').textContent = '☁️ Saved';
+  document.getElementById('savedNote').textContent = '✓ Saved';
   if (manual) toast('💾 Design saved to Your projects');
 }
 function loadDesign(id){
@@ -955,7 +1117,7 @@ function loadDesign(id){
     canvas.setBackgroundColor(d.bg || '#ffffff', () => {});
     canvas.renderAll(); saving = false; history = []; hIndex = -1; pushHistory(true); renderLayers(); fitZoom();
     currentDesignId = d.id; document.getElementById('docTitle').value = d.name;
-    document.getElementById('savedNote').textContent = '☁️ Saved';
+    document.getElementById('savedNote').textContent = '✓ Saved';
   });
 }
 
@@ -1034,44 +1196,100 @@ function exportPDF(){ withWatermark(() => { const { jsPDF } = window.jspdf; cons
 function openPayment(plan){ document.getElementById('pfPlan').value = plan || 'monthly'; updatePayAmount(); openModal('paymentModal'); }
 function updatePayAmount(){ document.getElementById('payAmount').textContent = 'Rs ' + PRICES[document.getElementById('pfPlan').value].toLocaleString(); }
 function copyNumber(){ if (navigator.clipboard) navigator.clipboard.writeText(EASYPAISA_NUMBER); toast('📋 Easypaisa number copied: ' + EASYPAISA_NUMBER); }
-function submitPayment(e){
+async function submitPayment(e){
   e.preventDefault();
   const plan = document.getElementById('pfPlan').value;
-  const order = { id: Date.now(), email: currentUser ? currentUser.email : '', name: document.getElementById('pfName').value.trim(), phone: document.getElementById('pfPhone').value.trim(), plan, amount: PRICES[plan], tid: document.getElementById('pfTid').value.trim(), status:'pending', date: new Date().toLocaleString() };
-  const shot = document.getElementById('pfShot').files[0];
-  const save = () => { const o = getOrders(); o.unshift(order); localStorage.setItem('kv_orders', JSON.stringify(o)); closeModal('paymentModal'); toast('✅ Order submitted! Pro activates after TID verification.'); e.target.reset(); renderOrders(); };
-  if (shot){ const r = new FileReader(); r.onload = () => { order.shot = r.result; save(); }; r.readAsDataURL(shot); } else save();
+  const tid = document.getElementById('pfTid').value.trim();
+  const shotFile = document.getElementById('pfShot').files[0];
+  const finish = async (shotData) => {
+    if (isCloud()){
+      const row = { user_id: cloudUser.id, email: currentUser.email, plan, amount: PRICES[plan], tid, screenshot: shotData || null };
+      const { data, error } = await sb.from('orders').insert(row).select().maybeSingle();
+      if (error){ toast('⚠️ Order submit nahi ho saka: ' + error.message); return; }
+      if (data) myOrdersCache.unshift(data);
+    } else {
+      const order = { id: Date.now(), email: currentUser ? currentUser.email : '', name: document.getElementById('pfName').value.trim(), phone: document.getElementById('pfPhone').value.trim(), plan, amount: PRICES[plan], tid, status: 'pending', date: new Date().toLocaleString(), shot: shotData || '' };
+      const o = JSON.parse(localStorage.getItem('kv_orders') || '[]'); o.unshift(order);
+      localStorage.setItem('kv_orders', JSON.stringify(o));
+    }
+    closeModal('paymentModal');
+    toast('✅ Order submitted! Pro activates after TID verification.');
+    e.target.reset(); renderOrders();
+  };
+  if (shotFile) processImageFile(shotFile, dataUrl => finish(dataUrl));
+  else finish(null);
 }
-function openAdmin(){
-  const orders = getOrders(); const el = document.getElementById('adminOrders');
-  el.innerHTML = orders.length ? orders.map(o => `<div class="order-item"><span class="st ${o.status}">${o.status.toUpperCase()}</span> <b>${escapeHtml(o.name)}</b> (${escapeHtml(o.email || '')}) — ${escapeHtml(o.phone)}<br>${o.plan === 'yearly' ? 'Pro Yearly' : 'Pro Monthly'} · Rs ${o.amount} · TID: <b>${escapeHtml(o.tid)}</b> · ${o.date}
+
+/* ---- Super Admin data (cloud): all profiles + all orders ---- */
+let adminUsersCache = null;   // profiles mapped to UI shape (+ designCount)
+let adminOrdersCache = null;  // orders mapped to UI shape
+function mapOrderRow(r){
+  return { id: r.id, user_id: r.user_id, email: r.email, name: '', phone: '', plan: r.plan, amount: r.amount,
+           tid: r.tid, status: r.status, date: r.created_at ? new Date(r.created_at).toLocaleString() : '', shot: r.screenshot || '' };
+}
+async function loadAdminData(){
+  if (!isCloud() || !isSuperAdmin()) return;
+  try {
+    const [pr, ord, dz] = await Promise.all([
+      sb.from('profiles').select('*').order('created_at', { ascending: true }),
+      sb.from('orders').select('*').order('created_at', { ascending: false }),
+      sb.from('designs').select('user_id')
+    ]);
+    const counts = {};
+    (dz.data || []).forEach(r => { counts[r.user_id] = (counts[r.user_id] || 0) + 1; });
+    adminUsersCache = (pr.data || []).map(p => ({ id: p.id, name: p.name || p.email.split('@')[0], email: p.email, picture: p.picture || '', blocked: !!p.blocked, plan: p.plan || 'free', google: false, designCount: counts[p.id] || 0 }));
+    adminOrdersCache = (ord.data || []).map(mapOrderRow);
+  } catch(e){ adminUsersCache = adminUsersCache || []; adminOrdersCache = adminOrdersCache || []; }
+}
+async function openAdmin(){
+  if (isCloud()) await loadAdminData();
+  const orders = isCloud() ? (adminOrdersCache || []) : JSON.parse(localStorage.getItem('kv_orders') || '[]');
+  const el = document.getElementById('adminOrders');
+  el.innerHTML = orders.length ? orders.map(o => `<div class="order-item"><span class="st ${o.status}">${o.status.toUpperCase()}</span> <b>${escapeHtml(o.name || o.email || '')}</b> (${escapeHtml(o.email || '')})<br>${o.plan === 'yearly' ? 'Pro Yearly' : 'Pro Monthly'} · Rs ${o.amount} · TID: <b>${escapeHtml(o.tid)}</b> · ${o.date}
     ${o.shot ? `<br><img src="${o.shot}" style="max-width:220px;border-radius:8px;margin-top:6px">` : ''}
     ${o.status === 'pending' ? `<div style="margin-top:8px"><button class="btn btn-primary" onclick="setOrder(${o.id},'approved')">✅ Approve</button> <button class="btn btn-ghost" onclick="setOrder(${o.id},'rejected')">❌ Reject</button></div>` : ''}</div>`).join('') : '<p class="muted">No orders yet.</p>';
   openModal('adminModal');
 }
-function setOrder(id, status){
-  const orders = getOrders(); const o = orders.find(x => x.id === id); if (!o) return;
-  o.status = status; localStorage.setItem('kv_orders', JSON.stringify(orders));
-  if (status === 'approved'){ localStorage.setItem('kv_plan_' + o.email, 'pro'); if (currentUser && currentUser.email === o.email) refreshPlanUI(); toast('⚡ Pro activated for ' + o.email); }
+async function setOrder(id, status){
+  if (isCloud()){
+    const o = (adminOrdersCache || []).find(x => x.id === id) || (myOrdersCache || []).map(mapOrderRow).find(x => x.id === id);
+    const { error } = await sb.from('orders').update({ status }).eq('id', id);
+    if (error){ toast('⚠️ ' + error.message); return; }
+    if (status === 'approved' && o && o.user_id){
+      await sb.from('profiles').update({ plan: 'pro' }).eq('id', o.user_id);
+      if (profileRow && cloudUser && o.user_id === cloudUser.id){ profileRow.plan = 'pro'; refreshPlanUI(); }
+      toast('⚡ Pro activated for ' + (o.email || 'user'));
+    }
+    await loadAdminData();
+  } else {
+    const orders = JSON.parse(localStorage.getItem('kv_orders') || '[]'); const o = orders.find(x => x.id === id); if (!o) return;
+    o.status = status; localStorage.setItem('kv_orders', JSON.stringify(orders));
+    if (status === 'approved'){ localStorage.setItem('kv_plan_' + o.email, 'pro'); if (currentUser && currentUser.email === o.email) refreshPlanUI(); toast('⚡ Pro activated for ' + o.email); }
+  }
   if (document.getElementById('adminModal').style.display !== 'none') openAdmin();
   renderOrders(); renderSuperAdmin();
 }
 
 /* ================= SUPER ADMIN ================= */
-function userPlan(email){ return localStorage.getItem('kv_plan_' + email) || 'free'; }
+function userPlan(email){
+  if (isCloud()){ const u = (adminUsersCache || []).find(x => x.email === email); return u ? u.plan : 'free'; }
+  return localStorage.getItem('kv_plan_' + email) || 'free';
+}
 function userDesignCount(email){
+  if (isCloud()){ const u = (adminUsersCache || []).find(x => x.email === email); return u ? (u.designCount || 0) : 0; }
   try { return JSON.parse(localStorage.getItem('kv_designs_' + email) || '[]').filter(d => !d.trashed).length; } catch(e){ return 0; }
 }
 function orderCardHTML(o, withActions){
-  return `<div class="order-item"><span class="st ${o.status}">${o.status.toUpperCase()}</span> <b>${escapeHtml(o.name)}</b> (${escapeHtml(o.email || '')}) — ${escapeHtml(o.phone)}<br>
+  return `<div class="order-item"><span class="st ${o.status}">${o.status.toUpperCase()}</span> <b>${escapeHtml(o.name || o.email || '')}</b> (${escapeHtml(o.email || '')})<br>
   ${o.plan === 'yearly' ? 'Pro Yearly' : 'Pro Monthly'} · Rs ${o.amount} · TID: <b>${escapeHtml(o.tid)}</b> · ${o.date}
   ${o.shot ? `<br><img src="${o.shot}" style="max-width:220px;border-radius:8px;margin-top:6px">` : ''}
   ${withActions && o.status === 'pending' ? `<div style="margin-top:8px"><button class="mini-btn pro" onclick="setOrder(${o.id},'approved')">✅ Approve — Pro on karo</button> <button class="mini-btn del" onclick="setOrder(${o.id},'rejected')">❌ Reject</button></div>` : ''}</div>`;
 }
-function renderSuperAdmin(){
+async function renderSuperAdmin(){
   if (!isSuperAdmin()) return;
-  const users = getUsers();
-  const orders = getOrders();
+  if (isCloud()) await loadAdminData();
+  const users = isCloud() ? (adminUsersCache || []) : [];
+  const orders = isCloud() ? (adminOrdersCache || []) : JSON.parse(localStorage.getItem('kv_orders') || '[]');
   const pending = orders.filter(o => o.status === 'pending');
   const revenue = orders.filter(o => o.status === 'approved').reduce((s, o) => s + (o.amount || 0), 0);
   const proCount = users.filter(u => userPlan(u.email) === 'pro').length;
@@ -1089,10 +1307,10 @@ function renderSuperAdmin(){
   if (saUsers){
     saUsers.innerHTML = users.length ? users.map(u => {
       const plan = userPlan(u.email);
-      const initials = u.name.split(' ').map(w => w[0]).slice(0,2).join('').toUpperCase();
+      const initials = (u.name || '?').split(' ').map(w => w[0]).slice(0,2).join('').toUpperCase();
       return `<div class="user-row">
         <div class="avatar">${u.picture ? '' : initials}</div>
-        <div class="u-info"><b>${escapeHtml(u.name)}</b>${u.blocked ? '<span class="blocked-chip">BLOCKED</span>' : ''}<span>${escapeHtml(u.email)} · ${u.google ? 'Google account' : 'Email account'} · ${userDesignCount(u.email)} designs</span></div>
+        <div class="u-info"><b>${escapeHtml(u.name)}</b>${u.blocked ? '<span class="blocked-chip">BLOCKED</span>' : ''}<span>${escapeHtml(u.email)} · ${userDesignCount(u.email)} designs</span></div>
         <span class="plan-badge ${plan === 'pro' ? 'pro' : 'free'}">${plan === 'pro' ? '⚡ PRO' : 'FREE'}</span>
         <div class="u-btns">
           ${plan === 'pro'
@@ -1103,8 +1321,7 @@ function renderSuperAdmin(){
             : `<button class="mini-btn block" onclick="saToggleBlock('${u.email}')">🚫 Block</button>`}
           ${u.email !== currentUser.email ? `<button class="mini-btn del" onclick="saDeleteUser('${u.email}')">🗑 Delete user</button>` : ''}
         </div></div>`;
-    }).join('') : '<div class="empty-note">No users registered yet on this device.</div>';
-    // set google avatars
+    }).join('') : '<div class="empty-note">No users yet — jab log sign up karenge to yahan nazar ayenge.</div>';
     [...saUsers.querySelectorAll('.user-row')].forEach((row, i) => { const u = users[i]; const av = row.querySelector('.avatar'); if (u.picture && av){ av.style.backgroundImage = 'url(' + u.picture + ')'; av.style.backgroundSize = 'cover'; } });
   }
   const saPending = document.getElementById('saPending');
@@ -1112,23 +1329,45 @@ function renderSuperAdmin(){
   const saAll = document.getElementById('saAllOrders');
   if (saAll) saAll.innerHTML = orders.length ? orders.map(o => orderCardHTML(o, false)).join('') : '<p class="muted small">No orders yet.</p>';
 }
-function saSetPlan(email, plan){
-  localStorage.setItem('kv_plan_' + email, plan);
-  if (currentUser && currentUser.email === email) refreshPlanUI();
+async function saSetPlan(email, plan){
+  if (isCloud()){
+    const u = (adminUsersCache || []).find(x => x.email === email); if (!u) return;
+    const { error } = await sb.from('profiles').update({ plan }).eq('id', u.id);
+    if (error){ toast('⚠️ ' + error.message); return; }
+    u.plan = plan;
+    if (profileRow && cloudUser && u.id === cloudUser.id){ profileRow.plan = plan; refreshPlanUI(); }
+  } else {
+    localStorage.setItem('kv_plan_' + email, plan);
+    if (currentUser && currentUser.email === email) refreshPlanUI();
+  }
   renderSuperAdmin();
   toast(plan === 'pro' ? '⚡ ' + email + ' is now PRO' : email + ' is now on Free plan');
 }
-function saToggleBlock(email){
-  const users = getUsers(); const u = users.find(x => x.email === email); if (!u) return;
-  u.blocked = !u.blocked; saveUsers(users); renderSuperAdmin();
+async function saToggleBlock(email){
+  if (!isCloud()){ toast('Block cloud accounts par lagta hai — Super Admin apne asal account se login karke khulta hai'); return; }
+  const u = (adminUsersCache || []).find(x => x.email === email); if (!u) return;
+  const { error } = await sb.from('profiles').update({ blocked: !u.blocked }).eq('id', u.id);
+  if (error){ toast('⚠️ ' + error.message); return; }
+  u.blocked = !u.blocked;
+  renderSuperAdmin();
   toast(u.blocked ? '🚫 ' + email + ' blocked — ab login nahi ho sakega' : '✅ ' + email + ' unblocked');
 }
-function saDeleteUser(email){
+async function saDeleteUser(email){
   if (!confirm('Delete user ' + email + ' and all their designs? This cannot be undone.')) return;
-  saveUsers(getUsers().filter(u => u.email !== email));
-  localStorage.removeItem('kv_plan_' + email);
-  localStorage.removeItem('kv_designs_' + email);
-  localStorage.removeItem('kv_brand_' + email);
+  if (isCloud()){
+    const u = (adminUsersCache || []).find(x => x.email === email); if (!u) return;
+    try {
+      await sb.from('designs').delete().eq('user_id', u.id);
+      await sb.from('brand_kits').delete().eq('user_id', u.id);
+      await sb.from('teams').delete().eq('owner_id', u.id);
+      await sb.from('profiles').delete().eq('id', u.id);
+    } catch(e){}
+    adminUsersCache = (adminUsersCache || []).filter(x => x.email !== email);
+  } else {
+    localStorage.removeItem('kv_plan_' + email);
+    localStorage.removeItem('kv_designs_' + email);
+    localStorage.removeItem('kv_brand_' + email);
+  }
   renderSuperAdmin(); toast('🗑 User deleted: ' + email);
 }
 
@@ -1176,9 +1415,9 @@ try { document.querySelectorAll('img[data-ic]').forEach(im => { const s = (windo
 
 /* init — session restore FIRST, and each step isolated so a render
    error can never block login restore again */
-(function boot(){
+(async function boot(){
   let sessionRestored = false;
-  try { sessionRestored = restoreSession(); } catch(e){}
+  try { sessionRestored = await restoreCloudSession(); } catch(e){}
   if (!sessionRestored){ document.getElementById('view-auth').style.display = ''; }
   try { renderTemplateGrids(); } catch(e){}
   try { renderShowcase(); } catch(e){}
