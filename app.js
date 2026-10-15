@@ -493,7 +493,7 @@ function openEditor(sizeId, tplId){
   document.getElementById('view-app').style.display = 'none';
   document.getElementById('view-auth').style.display = 'none';
   document.getElementById('view-editor').style.display = '';
-  if (!canvas) initCanvas();
+  if (!canvas || canvas.isStaticCanvas) initCanvas();
   if (sizeId) setSize(sizeId);
   if (tplId) applyTemplate(tplId);
   const sp = document.querySelector('.sidepanel');
@@ -1309,7 +1309,8 @@ function renderTemplateLists(){
 async function applyTemplate(id){
   const tpl = TEMPLATES.find(t => t.id === id); if (!tpl) return;
   if (tpl.pro && !isPro()){ requirePro('This template'); return; }
-  if (!canvas) openEditor(null, null);
+  const edv = document.getElementById('view-editor');
+  if (!canvas || canvas.isStaticCanvas || !edv || edv.style.display === 'none') openEditor(null, null);
   if (tpl.size && SIZES.find(s => s.id === tpl.size)) setSize(tpl.size);
   saving = true; canvas.clear(); canvas.setBackgroundColor('#ffffff', () => {});
   const r = BUILDERS[id]();
