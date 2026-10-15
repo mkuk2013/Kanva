@@ -409,3 +409,9 @@ button{cursor:pointer;font-family:inherit}
 .sidebar{height:100%;align-self:flex-start}
 .main-col{flex:1;min-width:0;overflow-y:auto}
 @media (max-width:900px){ .logout-btn .sn-txt{display:none} .logout-btn{padding:9px} }
+
+/* ---- sidebar user block hamesha neeche chipka hua (scroll ki zaroorat nahi) ---- */
+.sidebar{position:relative;padding-bottom:118px}
+.side-user{position:absolute;left:0;right:0;bottom:0;margin-top:0;background:#fff;padding:12px;z-index:6}
+.side-nav .snav{padding-top:8px;padding-bottom:8px}
+@media (max-width:900px){ .sidebar{padding-bottom:126px} }
