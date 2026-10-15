@@ -69,12 +69,12 @@ async function handleAuth(e){
     if (authMode === 'signup'){
       if (!name){ err.textContent = 'Please enter your full name.'; return; }
       const { data, error } = await sb.auth.signUp({ email, password: pass, options: { data: { full_name: name } } });
-      if (error){ err.textContent = error.message; return; }
+      if (error){ err.textContent = /rate limit/i.test(error.message) ? 'Bohat zyada signups ho rahe hain — kuch minute baad dobara try karein.' : /already registered/i.test(error.message) ? 'Ye email pehle se registered hai — please Log in karein.' : error.message; return; }
       if (data.session){ const ok = await afterAuth(data.user); if (ok) toast('🎉 Welcome to Kanva, ' + name.split(' ')[0] + '!'); }
       else { err.textContent = '✅ Account ban gaya! Apni email par aye hue confirmation link par click karein, phir yahan login karein.'; if (authMode === 'signup') toggleAuthMode(); }
     } else {
       const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
-      if (error){ err.textContent = error.message === 'Invalid login credentials' ? 'Email ya password ghalat hai. Dobara try karein, ya Sign up karein agar account nahi hai.' : error.message; return; }
+      if (error){ err.textContent = error.message === 'Invalid login credentials' ? 'Email ya password ghalat hai. Dobara try karein, ya Sign up karein agar account nahi hai.' : /not confirmed/i.test(error.message) ? 'Apni email pehle confirm karein — confirmation link aap ki email par gaya tha, us par click karke phir login karein.' : /rate limit/i.test(error.message) ? 'Bohat zyada koshish ho gayi — kuch minute baad dobara try karein.' : error.message; return; }
       const ok = await afterAuth(data.user);
       if (ok) toast('👋 Welcome back, ' + currentUser.name.split(' ')[0] + '!');
     }
