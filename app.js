@@ -484,6 +484,7 @@ function removeTeamMember(email){
 
 /* ================= EDITOR ================= */
 let canvas, zoom = 1, history = [], hIndex = -1, saving = false;
+let editorCanvas = null;
 let currentSize = SIZES[0], currentDesignId = null;
 let uploads = JSON.parse(localStorage.getItem('kv_uploads') || '[]');
 
@@ -494,7 +495,7 @@ function openEditor(sizeId, tplId){
   document.getElementById('view-app').style.display = 'none';
   document.getElementById('view-auth').style.display = 'none';
   document.getElementById('view-editor').style.display = '';
-  if (!canvas || canvas.isStaticCanvas) initCanvas();
+  if (!editorCanvas) initCanvas(); else if (canvas !== editorCanvas) canvas = editorCanvas;
   if (sizeId) setSize(sizeId);
   if (tplId) applyTemplate(tplId);
   const sp = document.querySelector('.sidepanel');
@@ -526,6 +527,7 @@ function openResize(){
 }
 function initCanvas(){
   canvas = new fabric.Canvas('c', { preserveObjectStacking: true, backgroundColor: '#ffffff' });
+  editorCanvas = canvas;
   canvas.setWidth(currentSize.w); canvas.setHeight(currentSize.h); updateSizeLbl();
   document.getElementById('pFont').innerHTML = FONTS.map(f => `<option value="${f}" style="font-family:'${f}'">${f}</option>`).join('');
   const stageEl = document.getElementById('stage');
@@ -1255,6 +1257,7 @@ function swapThumbs(){
 async function renderOneThumb(t){
   const size = SIZES.find(s => s.id === (t.size || 'ig-post')) || SIZES[0];
   const tc = new fabric.StaticCanvas(null, { width: size.w, height: size.h });
+  tc.__isThumb = true;
   canvas = tc; currentSize = size;
   tc.setBackgroundColor('#ffffff', () => {});
   const r = BUILDERS[t.id]();
@@ -1278,7 +1281,7 @@ async function renderAllThumbs(){
     if (edNow && edNow.style.display !== 'none') break;
     try { await renderOneThumb(t); swapThumbs(); } catch(e){}
   }
-  if (canvas && canvas.isStaticCanvas){ canvas = savedCanvas; currentSize = savedSize; }
+  if (canvas && canvas.__isThumb){ canvas = savedCanvas; currentSize = savedSize; }
   thumbBusy = false;
 }
 let activeCat = 'All';
@@ -1311,7 +1314,8 @@ async function applyTemplate(id){
   const tpl = TEMPLATES.find(t => t.id === id); if (!tpl) return;
   if (tpl.pro && !isPro()){ requirePro('This template'); return; }
   const edv = document.getElementById('view-editor');
-  if (!canvas || canvas.isStaticCanvas || !edv || edv.style.display === 'none') openEditor(null, null);
+  if (!editorCanvas || canvas !== editorCanvas || !edv || edv.style.display === 'none') openEditor(null, null);
+  if (!editorCanvas || canvas !== editorCanvas) return;
   if (tpl.size && SIZES.find(s => s.id === tpl.size)) setSize(tpl.size);
   const ec = canvas;
   saving = true; canvas.clear(); canvas.setBackgroundColor('#ffffff', () => {});
@@ -1700,3 +1704,6 @@ async function saveProfileName(){
   renderAccount();
   toast('✅ Profile name saved');
 }
+
+
+function closePanel(){ const p = document.querySelector('.sidepanel'); if (p) p.classList.remove('open'); }
