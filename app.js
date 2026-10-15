@@ -927,7 +927,9 @@ function addPhoto(url, xP, yP, wP, hP, r){
         const s = Math.max(w / img.width, h / img.height);
         img.set({ left:x, top:y, scaleX:s, scaleY:s, name:'Photo',
           clipPath: new fabric.Rect({ left:x, top:y, width:w, height:h, rx:rad, ry:rad, absolutePositioned:true }) });
-        cv.add(img); cv.remove(ph); cv.renderAll(); res();
+        const idx = cv.getObjects().indexOf(ph);
+        if (idx >= 0) cv.insertAt(img, idx); else cv.add(img);
+        cv.remove(ph); cv.renderAll(); res();
       }, { crossOrigin:'anonymous' });
     } catch(e){ res(); }
   });
