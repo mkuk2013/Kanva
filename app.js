@@ -12,14 +12,14 @@ const PRICES = { monthly: 599, yearly: 4999 };
 const SUPER_ADMIN_EMAILS = ['mkuk2013@gmail.com'];
 function isSuperAdmin(){ return !!currentUser && SUPER_ADMIN_EMAILS.includes(currentUser.email); }
 const SIZES = [
-  { id:'ig-post',  name:'Instagram Post',    w:1080, h:1080, icon:'📸' },
-  { id:'ig-story', name:'Story / Reel',      w:1080, h:1920, icon:'📱' },
-  { id:'fb-post',  name:'Facebook Post',     w:1200, h:630,  icon:'👍' },
-  { id:'yt-thumb', name:'YouTube Thumbnail', w:1280, h:720,  icon:'▶️' },
-  { id:'logo',     name:'Logo',              w:500,  h:500,  icon:'⭕' },
-  { id:'pres',     name:'Presentation',      w:1920, h:1080, icon:'📊' },
-  { id:'poster',   name:'Poster',            w:794,  h:1123, icon:'🖼️' },
-  { id:'fb-cover', name:'Facebook Cover',    w:1640, h:924,  icon:'🌆' },
+  { id:'ig-post',  name:'Instagram Post',    w:1080, h:1080, icon:'ig' },
+  { id:'ig-story', name:'Story / Reel',      w:1080, h:1920, icon:'story' },
+  { id:'fb-post',  name:'Facebook Post',     w:1200, h:630,  icon:'fb' },
+  { id:'yt-thumb', name:'YouTube Thumbnail', w:1280, h:720,  icon:'yt' },
+  { id:'logo',     name:'Logo',              w:500,  h:500,  icon:'logo' },
+  { id:'pres',     name:'Presentation',      w:1920, h:1080, icon:'pres' },
+  { id:'poster',   name:'Poster',            w:794,  h:1123, icon:'poster' },
+  { id:'fb-cover', name:'Facebook Cover',    w:1640, h:924,  icon:'cover' },
 ];
 const FONTS = ['Poppins','Inter','Montserrat','Roboto','Oswald','Bebas Neue','Playfair Display','Pacifico','Dancing Script','Anton','Lobster','Arial','Georgia','Verdana','Courier New'];
 
@@ -176,7 +176,7 @@ function enterApp(){
   document.getElementById('userName').textContent = currentUser.name;
   const oldAdminNav = document.querySelector('.side-nav .admin-nav'); if (oldAdminNav) oldAdminNav.remove();
   if (isSuperAdmin() && !document.querySelector('.side-nav .sa-nav')){
-    document.querySelector('.side-nav').insertAdjacentHTML('beforeend', '<a class="snav sa-nav" data-page="superadmin" onclick="goPage(\'superadmin\')">👑 Super Admin</a>');
+    document.querySelector('.side-nav').insertAdjacentHTML('beforeend', '<a class="snav sa-nav" data-page="superadmin" onclick="goPage(\'superadmin\')"><img class="nav-ic" src="' + KV_ICONS.admin + '" alt=""><span class="sn-txt">Super Admin</span></a>');
   }
   refreshPlanUI(); renderDashboard(); goPage('home');
 }
@@ -203,11 +203,11 @@ function refreshPlanUI(){
 }
 function renderDashboard(){
   document.getElementById('typeRow').innerHTML = SIZES.map(s =>
-    `<button class="type-item" onclick="openEditor('${s.id}')"><span class="type-ic">${s.icon}</span>${s.name}</button>`).join('') +
+    `<button class="type-item" onclick="openEditor('${s.id}')"><span class="type-ic"><img src="${KV_ICONS[s.icon]}" alt=""></span>${s.name}</button>`).join('') +
     `<button class="type-item" onclick="customSize()"><span class="type-ic">✂️</span>Custom size</button>`;
   document.getElementById('createMenu').innerHTML = SIZES.map(s =>
-    `<button onclick="openEditor('${s.id}')">${s.icon} ${s.name} <small>${s.w} × ${s.h} px</small></button>`).join('') +
-    `<button onclick="customSize()">✂️ Custom size</button>`;
+    `<button onclick="openEditor('${s.id}')"><img class="cm-ic" src="${KV_ICONS[s.icon]}" alt="">${s.name} <small>${s.w} × ${s.h} px</small></button>`).join('') +
+    `<button onclick="customSize()"><img class="cm-ic" src="' + KV_ICONS.custom + '" alt="">Custom size</button>`;
   const designs = getDesigns().filter(d => !d.trashed).slice(0, 10);
   document.getElementById('recentRow').innerHTML = designs.length ? designs.map(d =>
     `<div class="recent-card" onclick="loadDesign(${d.id})"><img src="${d.thumb}" alt=""><div class="rc-name">${escapeHtml(d.name)}</div><div class="rc-date">${d.updated}</div></div>`).join('')
@@ -1170,6 +1170,9 @@ window.addEventListener('resize', () => { if (canvas && document.getElementById(
 let deferredPrompt = null;
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredPrompt = e; const b = document.getElementById('installBtn'); if (b) b.style.display = ''; });
 function installApp(){ if (deferredPrompt){ deferredPrompt.prompt(); deferredPrompt.userChoice.then(() => { deferredPrompt = null; }); } else toast('Browser menu ⋮ → “Install app / Add to Home screen”'); }
+
+/* static icon images */
+try { document.querySelectorAll('img[data-ic]').forEach(im => { const s = (window.KV_ICONS || {})[im.dataset.ic]; if (s) im.src = s; }); } catch(e){}
 
 /* init — session restore FIRST, and each step isolated so a render
    error can never block login restore again */
