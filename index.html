@@ -9,7 +9,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="kanva-logo.png">
 <link rel="apple-touch-icon" href="Kanva icon 192.png">
-<link rel="stylesheet" href="style.css?v=8">
+<link rel="stylesheet" href="style.css?v=9">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700&family=Bebas+Neue&family=Pacifico&family=Montserrat:wght@500;700;900&family=Roboto:wght@400;700&family=Oswald:wght@500;700&family=Dancing+Script:wght@700&family=Anton&family=Lobster&display=swap" rel="stylesheet">
 </head>
@@ -79,10 +79,10 @@
     <h2>Everything you need to design your best work</h2>
     <p class="lp-sub">One simple editor for every kind of design.</p>
     <div class="lp-cards">
-      <div class="lp-card c1"><span class="lp-card-ic">🎨</span><h3>Drag &amp; drop editor</h3><p>Move, resize and style anything on the canvas — text, photos, shapes and stickers — with ready-made fonts, shadows and effects.</p></div>
-      <div class="lp-card c2"><span class="lp-card-ic">📐</span><h3>Templates that start you off</h3><p>Sale posts, quotes, invites, menus, course promos and more. Pick a template, change the words, and it is yours.</p></div>
-      <div class="lp-card c3"><span class="lp-card-ic">🖼️</span><h3>Photos &amp; elements built in</h3><p>A photo library, shapes, lines, frames and stickers are already inside — plus upload your own images and logo.</p></div>
-      <div class="lp-card c4"><span class="lp-card-ic">⬇️</span><h3>Download in one click</h3><p>Export your design as PNG, JPG or PDF. Go Pro for full HD downloads without the watermark.</p></div>
+      <div class="lp-card c1"><span class="lp-card-ic"><img data-ic="styles" alt=""></span><h3>Drag &amp; drop editor</h3><p>Move, resize and style anything on the canvas — text, photos, shapes and stickers — with ready-made fonts, shadows and effects.</p></div>
+      <div class="lp-card c2"><span class="lp-card-ic"><img data-ic="templates" alt=""></span><h3>Templates that start you off</h3><p>Sale posts, quotes, invites, menus, course promos and more. Pick a template, change the words, and it is yours.</p></div>
+      <div class="lp-card c3"><span class="lp-card-ic"><img data-ic="photos" alt=""></span><h3>Photos &amp; elements built in</h3><p>A photo library, shapes, lines, frames and stickers are already inside — plus upload your own images and logo.</p></div>
+      <div class="lp-card c4"><span class="lp-card-ic"><img data-ic="download" alt=""></span><h3>Download in one click</h3><p>Export your design as PNG, JPG or PDF. Go Pro for full HD downloads without the watermark.</p></div>
     </div>
   </section>
 
@@ -136,7 +136,7 @@
     <header class="app-top">
       <div class="search-wrap">🔍 <input id="globalSearch" placeholder="Search templates, designs…" oninput="onSearch(this.value)"></div>
       <span id="planBadge" class="plan-badge free">FREE</span>
-      <button class="btn btn-upgrade" id="upgradeBtn" onclick="openPayment('monthly')">⚡ Upgrade to Pro</button>
+      <button class="btn btn-upgrade" id="upgradeBtn" onclick="openPayment('monthly')"><img class="cm-ic" data-ic="plans" alt="">Upgrade to Pro</button>
       <button id="installBtn" class="btn btn-ghost" style="display:none" onclick="installApp()">📲 Install App</button>
       <div class="avatar small-av" id="userAvatar2">U</div>
     </header>
@@ -267,14 +267,14 @@
       <span class="ed-sep"></span>
       <button class="ed-icon" onclick="undo()" title="Undo">↩</button>
       <button class="ed-icon" onclick="redo()" title="Redo">↪</button>
-      <span class="saved-note" id="savedNote">☁️ Saved</span>
+      <span class="saved-note" id="savedNote">✓ Saved</span>
     </div>
     <input id="docTitle" class="doc-title" value="Untitled design" onchange="docTitleChanged()">
     <div class="ed-right">
       <span id="planBadge2" class="plan-badge free">FREE</span>
       <div class="avatar small-av" id="userAvatar3">U</div>
-      <button class="btn btn-white" onclick="openShare()">↗ Share</button>
-      <button class="btn btn-download" onclick="toggleExportMenu()">⬇ Download</button>
+      <button class="btn btn-white" onclick="openShare()"><img class="cm-ic" data-ic="share" alt="">Share</button>
+      <button class="btn btn-download" onclick="toggleExportMenu()"><img class="cm-ic" data-ic="download" alt="">Download</button>
       <div id="exportMenu" class="export-menu" style="display:none">
         <button onclick="exportPNG(1)"><img class="cm-ic" data-ic="photos" alt="">PNG — Standard (Free)</button>
         <button onclick="exportPNG(3)"><img class="cm-ic" data-ic="photos" alt="">PNG — HD ⚡ Pro</button>
@@ -396,7 +396,7 @@
 <div class="modal-bg" id="paymentModal" style="display:none">
   <div class="modal">
     <button class="modal-x" onclick="closeModal('paymentModal')">✕</button>
-    <h3>⚡ Upgrade to Pro</h3>
+    <h3><img class="cm-ic" data-ic="plans" alt="">Upgrade to Pro</h3>
     <div class="pay-step"><b>Step 1:</b> Send <b id="payAmount">Rs 599</b> via Easypaisa to:</div>
     <div class="easypaisa-box">
       <div><span>Number</span><b>03363268833</b> <button class="copy-btn" onclick="copyNumber()">Copy</button></div>
@@ -419,10 +419,10 @@
 <div class="modal-bg" id="shareModal" style="display:none">
   <div class="modal">
     <button class="modal-x" onclick="closeModal('shareModal')">✕</button>
-    <h3>↗ Share this design</h3>
+    <h3><img class="cm-ic" data-ic="share" alt="">Share this design</h3>
     <p class="muted small">Anyone with this link can view a copy of this design in Kanva.</p>
     <div class="share-row"><input id="shareLink" readonly><button class="btn btn-primary" onclick="copyShare()">Copy link</button></div>
-    <button class="btn btn-ghost btn-block" onclick="closeModal('shareModal');toggleExportMenu()">⬇ Or download it instead</button>
+    <button class="btn btn-ghost btn-block" onclick="closeModal('shareModal');toggleExportMenu()"><img class="cm-ic" data-ic="download" alt="">Or download it instead</button>
   </div>
 </div>
 
@@ -441,10 +441,11 @@
 <script>if (!window.fabric) { document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"><\/script>'); }</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="icons1.js?v=1"></script>
-<script src="icons2.js?v=1"></script>
-<script src="icons3.js?v=1"></script>
-<script src="app.js?v=17"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="icons1.js?v=2"></script>
+<script src="icons2.js?v=2"></script>
+<script src="icons3.js?v=2"></script>
+<script src="app.js?v=19"></script>
 <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(()=>{}); }</script>
 </body>
 </html>
