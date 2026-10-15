@@ -264,16 +264,10 @@ button{cursor:pointer;font-family:inherit}
   .lp-hero-cta{justify-content:center}
   .lp-floats{display:none}
   .sidebar{width:70px}.sidebar .side-brand span,.su-info{display:none}
-  .create-btn{font-size:0;padding:12px}.create-btn:after{content:'＋';font-size:18px}
-  .side-nav .snav{justify-content:center;font-size:0;padding:11px 0}
-  .side-nav .snav:before{font-size:19px}
-  .side-nav .snav[data-page="home"]:before{content:'🏠'}
-  .side-nav .snav[data-page="projects"]:before{content:'📁'}
-  .side-nav .snav[data-page="templates"]:before{content:'📐'}
-  .side-nav .snav[data-page="brand"]:before{content:'🎨'}
-  .side-nav .snav[data-page="pricing"]:before{content:'💎'}
-  .side-nav .snav[data-page="trash"]:before{content:'🗑️'}
-  .side-nav .snav.sa-nav:before{content:'👑'}
+  .create-btn{padding:10px;justify-content:center}.create-btn .sn-txt{display:none}.create-btn .nav-ic{margin-right:0}
+  .side-nav .snav{justify-content:center;padding:9px 0}
+  .side-nav .snav .sn-txt,.side-nav .snav .pro-chip{display:none}
+  .side-nav .snav .nav-ic{margin-right:0;width:26px;height:26px}
   .sidepanel{width:220px}
 }
 
@@ -295,7 +289,6 @@ button{cursor:pointer;font-family:inherit}
 .team-av{width:38px;height:38px;font-size:13px}
 .team-info{flex:1;display:flex;flex-direction:column}
 .team-info span{font-size:12px;color:#7a8194}
-@media(max-width:900px){.side-nav .snav[data-page="team"]:before{content:'👥'}}
 
 /* ============ MOBILE PASS (2026-10-15) ============ */
 @media(max-width:900px){
@@ -337,3 +330,12 @@ button{cursor:pointer;font-family:inherit}
   .design-grid{grid-template-columns:repeat(2,1fr)}
   .dc-btns button{padding:5px 7px;font-size:11px}
 }
+
+/* original icon images (raster set) */
+.nav-ic{width:23px;height:23px;border-radius:7px;margin-right:9px;flex:none;box-shadow:0 2px 6px rgba(20,10,60,.18)}
+.snav{display:flex;align-items:center}
+.create-btn{display:flex;align-items:center;gap:2px}
+.create-btn .nav-ic{width:20px;height:20px;border-radius:6px}
+.rail-ic{width:28px;height:28px;border-radius:9px;display:block;margin:0 auto 3px;box-shadow:0 2px 6px rgba(20,10,60,.18)}
+.type-ic img{width:32px;height:32px;border-radius:10px;display:block}
+.cm-ic{width:21px;height:21px;border-radius:6px;vertical-align:-6px;margin-right:8px}

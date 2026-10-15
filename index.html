@@ -9,7 +9,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="kanva-logo.png">
 <link rel="apple-touch-icon" href="Kanva icon 192.png">
-<link rel="stylesheet" href="style.css?v=7">
+<link rel="stylesheet" href="style.css?v=8">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700&family=Bebas+Neue&family=Pacifico&family=Montserrat:wght@500;700;900&family=Roboto:wght@400;700&family=Oswald:wght@500;700&family=Dancing+Script:wght@700&family=Anton&family=Lobster&display=swap" rel="stylesheet">
 </head>
@@ -113,16 +113,16 @@
   <!-- sidebar -->
   <aside class="sidebar">
     <div class="side-brand"><div class="brand-mark"><img src="kanva-logo.png" alt="Kanva logo"></div><span>Kanva</span></div>
-    <button class="create-btn" onclick="toggleCreateMenu()">＋ Create new</button>
+    <button class="create-btn" onclick="toggleCreateMenu()"><img class="nav-ic" data-ic="plus" alt=""><span class="sn-txt">Create new</span></button>
     <div id="createMenu" class="create-menu" style="display:none"></div>
     <nav class="side-nav">
-      <a class="snav active" data-page="home" onclick="goPage('home')">🏠 Home</a>
-      <a class="snav" data-page="projects" onclick="goPage('projects')">📁 Your projects</a>
-      <a class="snav" data-page="templates" onclick="goPage('templates')">📐 Templates</a>
-      <a class="snav" data-page="brand" onclick="goPage('brand')">🎨 Brand Kit <span class="pro-chip">PRO</span></a>
-      <a class="snav" data-page="team" onclick="goPage('team')">👥 Team <span class="pro-chip">PRO</span></a>
-      <a class="snav" data-page="pricing" onclick="goPage('pricing')">💎 Plans & Pricing</a>
-      <a class="snav" data-page="trash" onclick="goPage('trash')">🗑️ Trash</a>
+      <a class="snav active" data-page="home" onclick="goPage('home')"><img class="nav-ic" data-ic="home" alt=""><span class="sn-txt">Home</span></a>
+      <a class="snav" data-page="projects" onclick="goPage('projects')"><img class="nav-ic" data-ic="projects" alt=""><span class="sn-txt">Your projects</span></a>
+      <a class="snav" data-page="templates" onclick="goPage('templates')"><img class="nav-ic" data-ic="templates" alt=""><span class="sn-txt">Templates</span></a>
+      <a class="snav" data-page="brand" onclick="goPage('brand')"><img class="nav-ic" data-ic="brand" alt=""><span class="sn-txt">Brand Kit</span> <span class="pro-chip">PRO</span></a>
+      <a class="snav" data-page="team" onclick="goPage('team')"><img class="nav-ic" data-ic="team" alt=""><span class="sn-txt">Team</span> <span class="pro-chip">PRO</span></a>
+      <a class="snav" data-page="pricing" onclick="goPage('pricing')"><img class="nav-ic" data-ic="plans" alt=""><span class="sn-txt">Plans & Pricing</span></a>
+      <a class="snav" data-page="trash" onclick="goPage('trash')"><img class="nav-ic" data-ic="trash" alt=""><span class="sn-txt">Trash</span></a>
     </nav>
     <div class="side-user">
       <div class="avatar" id="userAvatar">U</div>
@@ -252,15 +252,15 @@
       <div class="file-wrap">
         <button class="ed-menu" onclick="toggleFileMenu(event)">File ▾</button>
         <div id="fileMenu" class="export-menu file-menu" style="display:none">
-          <button onclick="newDesign()">✨ New design</button>
-          <button onclick="saveDesign(true);hideFileMenu()">💾 Save</button>
-          <button onclick="saveAsCopy()">⧉ Save a copy</button>
-          <button onclick="openProjectsFromEditor()">📁 Open a project…</button>
-          <button onclick="clearCanvasAll()">🧹 Clear canvas</button>
+          <button onclick="newDesign()"><img class="cm-ic" data-ic="new" alt="">New design</button>
+          <button onclick="saveDesign(true);hideFileMenu()"><img class="cm-ic" data-ic="save" alt="">Save</button>
+          <button onclick="saveAsCopy()"><img class="cm-ic" data-ic="copy" alt="">Save a copy</button>
+          <button onclick="openProjectsFromEditor()"><img class="cm-ic" data-ic="projects" alt="">Open a project…</button>
+          <button onclick="clearCanvasAll()"><img class="cm-ic" data-ic="clear" alt="">Clear canvas</button>
           <span class="fm-sep"></span>
-          <button onclick="exportPNG(1);hideFileMenu()">⬇ Download PNG</button>
-          <button onclick="exportPDF();hideFileMenu()">⬇ Download PDF</button>
-          <button onclick="openShare();hideFileMenu()">↗ Share design</button>
+          <button onclick="exportPNG(1);hideFileMenu()"><img class="cm-ic" data-ic="photos" alt="">Download PNG</button>
+          <button onclick="exportPDF();hideFileMenu()"><img class="cm-ic" data-ic="poster" alt="">Download PDF</button>
+          <button onclick="openShare();hideFileMenu()"><img class="cm-ic" data-ic="share" alt="">Share design</button>
         </div>
       </div>
       <button class="ed-menu" onclick="openResize()">Resize <span id="curSizeLbl"></span></button>
@@ -276,10 +276,10 @@
       <button class="btn btn-white" onclick="openShare()">↗ Share</button>
       <button class="btn btn-download" onclick="toggleExportMenu()">⬇ Download</button>
       <div id="exportMenu" class="export-menu" style="display:none">
-        <button onclick="exportPNG(1)">PNG — Standard (Free)</button>
-        <button onclick="exportPNG(3)">PNG — HD ⚡ Pro</button>
-        <button onclick="exportJPG()">JPG</button>
-        <button onclick="exportPDF()">PDF</button>
+        <button onclick="exportPNG(1)"><img class="cm-ic" data-ic="photos" alt="">PNG — Standard (Free)</button>
+        <button onclick="exportPNG(3)"><img class="cm-ic" data-ic="photos" alt="">PNG — HD ⚡ Pro</button>
+        <button onclick="exportJPG()"><img class="cm-ic" data-ic="photos" alt="">JPG</button>
+        <button onclick="exportPDF()"><img class="cm-ic" data-ic="poster" alt="">PDF</button>
       </div>
     </div>
   </div>
@@ -337,13 +337,13 @@
 
   <div class="ed-body">
     <div class="rail">
-      <button class="rail-btn active" data-tab="templates" onclick="switchTab('templates')">📐<span>Templates</span></button>
-      <button class="rail-btn" data-tab="elements" onclick="switchTab('elements')">⭐<span>Elements</span></button>
-      <button class="rail-btn" data-tab="text" onclick="switchTab('text')">🔤<span>Text</span></button>
-      <button class="rail-btn" data-tab="photos" onclick="switchTab('photos')">🖼️<span>Photos</span></button>
-      <button class="rail-btn" data-tab="uploads" onclick="switchTab('uploads')">📤<span>Uploads</span></button>
-      <button class="rail-btn" data-tab="background" onclick="switchTab('background')">🎨<span>Styles</span></button>
-      <button class="rail-btn" data-tab="layers" onclick="switchTab('layers')">🗂️<span>Layers</span></button>
+      <button class="rail-btn active" data-tab="templates" onclick="switchTab('templates')"><img class="rail-ic" data-ic="templates" alt=""><span>Templates</span></button>
+      <button class="rail-btn" data-tab="elements" onclick="switchTab('elements')"><img class="rail-ic" data-ic="elements" alt=""><span>Elements</span></button>
+      <button class="rail-btn" data-tab="text" onclick="switchTab('text')"><img class="rail-ic" data-ic="text" alt=""><span>Text</span></button>
+      <button class="rail-btn" data-tab="photos" onclick="switchTab('photos')"><img class="rail-ic" data-ic="photos" alt=""><span>Photos</span></button>
+      <button class="rail-btn" data-tab="uploads" onclick="switchTab('uploads')"><img class="rail-ic" data-ic="uploads" alt=""><span>Uploads</span></button>
+      <button class="rail-btn" data-tab="background" onclick="switchTab('background')"><img class="rail-ic" data-ic="styles" alt=""><span>Styles</span></button>
+      <button class="rail-btn" data-tab="layers" onclick="switchTab('layers')"><img class="rail-ic" data-ic="layers" alt=""><span>Layers</span></button>
     </div>
     <aside class="sidepanel">
       <div class="tabpage" id="tab-templates"><h4>Templates</h4><div class="tpl-list" id="tplList"></div></div>
@@ -441,7 +441,10 @@
 <script>if (!window.fabric) { document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"><\/script>'); }</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="app.js?v=16"></script>
+<script src="icons1.js?v=1"></script>
+<script src="icons2.js?v=1"></script>
+<script src="icons3.js?v=1"></script>
+<script src="app.js?v=17"></script>
 <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(()=>{}); }</script>
 </body>
 </html>
