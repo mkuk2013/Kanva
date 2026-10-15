@@ -368,8 +368,8 @@ function renderDashboard(){
     `<button class="type-item" onclick="openEditor('${s.id}')"><span class="type-ic"><img src="${KV_ICONS[s.icon]}" alt=""></span>${s.name}</button>`).join('') +
     `<button class="type-item" onclick="customSize()"><span class="type-ic"><img src="${KV_ICONS.custom}" alt=""></span>Custom size</button>`;
   document.getElementById('createMenu').innerHTML = SIZES.map(s =>
-    `<button onclick="openEditor('${s.id}')"><img class="cm-ic" src="${KV_ICONS[s.icon]}" alt="">${s.name} <small>${s.w} × ${s.h} px</small></button>`).join('') +
-    `<button onclick="customSize()"><img class="cm-ic" src="' + KV_ICONS.custom + '" alt="">Custom size</button>`;
+    `<button onclick="toggleCreateMenu();openEditor('${s.id}')"><img class="cm-ic" src="${KV_ICONS[s.icon]}" alt="">${s.name} <small>${s.w} × ${s.h} px</small></button>`).join('') +
+    `<button onclick="toggleCreateMenu();customSize()"><img class="cm-ic" src="' + KV_ICONS.custom + '" alt="">Custom size</button>`;
   const designs = getDesigns().filter(d => !d.trashed).slice(0, 10);
   document.getElementById('recentRow').innerHTML = designs.length ? designs.map(d =>
     `<div class="recent-card" onclick="loadDesign(${d.id})"><img src="${d.thumb}" alt=""><div class="rc-name">${escapeHtml(d.name)}</div><div class="rc-date">${d.updated}</div></div>`).join('')
@@ -453,7 +453,7 @@ function renderTeam(){
     else mb.style.display = 'none';
   }
   const t = getTeam();
-  const tc = document.getElementById('teamCount'); if (tc) tc.textContent = t.length + ' / 5 members';
+  const tc = document.getElementById('teamCount'); if (tc) tc.textContent = t.length + ' / 500 members';
   if (!ownerPro) return;
   const list = document.getElementById('teamList'); if (!list) return;
   list.innerHTML = t.length ? t.map(m =>
@@ -469,7 +469,7 @@ function addTeamMember(){
   if (!name || !email || email.indexOf('@') < 1){ toast('Member ka naam aur sahi email likhein'); return; }
   if (email === currentUser.email){ toast('Apne aap ko team mein add nahi kar sakte 🙂'); return; }
   const t = getTeam();
-  if (t.length >= 5){ toast('Team limit poori — zyada se zyada 5 members'); return; }
+  if (t.length >= 500){ toast('Team limit poori — zyada se zyada 500 members'); return; }
   if (t.some(m => m.email === email)){ toast('Ye email pehle se team mein hai'); return; }
   t.push({ name, email, role, added: new Date().toLocaleDateString() });
   saveTeam(t); renderTeam();
@@ -898,7 +898,7 @@ function renderPhotos(){
   [...g.querySelectorAll('img')].forEach((img, i) => { img.onclick = () => addImageURL('https://picsum.photos/seed/kanva-' + PHOTO_SEEDS[i] + '/900/700'); });
 }
 
-/* ================= TEMPLATES (20) ================= */
+/* ================= TEMPLATES (30) — original Kanva designs ================= */
 function T(t, o){ return new fabric.Textbox(t, Object.assign({ textAlign:'center', name:'Text' }, o)); }
 function gradRect(a, b){
   const r = new fabric.Rect({ left:0, top:0, width:currentSize.w, height:currentSize.h, selectable:false, evented:false, name:'__bg' });
@@ -907,137 +907,377 @@ function gradRect(a, b){
 }
 function solidBg(c){ canvas.setBackgroundColor(c, () => canvas.renderAll()); }
 function addAt(o, xPct, yPct){ o.set({ left: currentSize.w*xPct - (o.width*(o.scaleX||1))/2, top: currentSize.h*yPct }); canvas.add(o); return o; }
+const PH = seed => 'https://picsum.photos/seed/kanva-' + seed + '/1000/1000';
+function addPhoto(url, xP, yP, wP, hP, r){
+  const W = currentSize.w, H = currentSize.h;
+  const x = W*xP, y = H*yP, w = W*wP, h = H*hP, rad = (r || 0) * W;
+  const ph = new fabric.Rect({ left:x, top:y, width:w, height:h, fill:'#c9ced6', rx:rad, ry:rad, name:'Photo' });
+  canvas.add(ph);
+  return new Promise(res => {
+    try {
+      fabric.Image.fromURL(url, img => {
+        if (!img){ res(); return; }
+        const s = Math.max(w / img.width, h / img.height);
+        img.set({ left:x, top:y, scaleX:s, scaleY:s, name:'Photo',
+          clipPath: new fabric.Rect({ left:x, top:y, width:w, height:h, rx:rad, ry:rad, absolutePositioned:true }) });
+        canvas.add(img); canvas.remove(ph); canvas.renderAll(); res();
+      }, { crossOrigin:'anonymous' });
+    } catch(e){ res(); }
+  });
+}
+function shade(xP, yP, wP, hP, color, op){
+  const r = new fabric.Rect({ left: currentSize.w*xP, top: currentSize.h*yP, width: currentSize.w*wP, height: currentSize.h*hP, fill: color, opacity: op, selectable:false, name:'Shade' });
+  canvas.add(r); return r;
+}
+function deco(xP, yP, rP, color, op){
+  const c = new fabric.Circle({ radius: currentSize.w*rP, left: currentSize.w*xP, top: currentSize.h*yP, fill: color, opacity: op, selectable:false, evented:false, name:'Deco' });
+  canvas.add(c); return c;
+}
+function badge(text, xP, yP, dP, bg, fg){
+  const W = currentSize.w, H = currentSize.h, d = W * dP;
+  const c = new fabric.Circle({ radius: d/2, left: W*xP - d/2, top: H*yP, fill: bg, name:'Badge', shadow: new fabric.Shadow({ color:'rgba(0,0,0,.25)', blur:8, offsetY:3 }) });
+  canvas.add(c);
+  const fs = d * (text.length > 5 ? .155 : .2);
+  const t = T(text, { fontFamily:'Poppins', fontWeight:800, fill: fg, fontSize: fs, width: d * .94 });
+  t.set({ left: W*xP - t.width/2, top: H*yP + d/2 - fs * .58 });
+  canvas.add(t); return c;
+}
+function pill(text, xP, yP, wP, bg, fg, fsP){
+  const W = currentSize.w, H = currentSize.h, w = W * wP, fs = W * (fsP || .036), h = fs * 2.15;
+  const r = new fabric.Rect({ width: w, height: h, fill: bg, rx: h/2, ry: h/2, name:'Pill' });
+  r.set({ left: W*xP - w/2, top: H*yP }); canvas.add(r);
+  const t = T(text, { fontFamily:'Poppins', fontWeight:700, fill: fg, fontSize: fs, width: w * .96 });
+  t.set({ left: W*xP - t.width/2, top: H*yP + (h - fs * 1.18) / 2 });
+  canvas.add(t); return r;
+}
+function hline(xP, yP, wP, color, weight){
+  const r = new fabric.Rect({ left: currentSize.w*xP - currentSize.w*wP/2, top: currentSize.h*yP, width: currentSize.w*wP, height: weight || 3, fill: color, name:'Line' });
+  canvas.add(r); return r;
+}
+function starShape(cxP, cyP, rP, color){
+  const W = currentSize.w, H = currentSize.h, R = W*rP, r = R * .45, pts = [];
+  for (let i = 0; i < 10; i++){ const ang = -Math.PI/2 + i * Math.PI/5, rad = i % 2 === 0 ? R : r; pts.push({ x: rad * Math.cos(ang), y: rad * Math.sin(ang) }); }
+  const s = new fabric.Polygon(pts, { fill: color, name:'Star', left: W*cxP, top: H*cyP, originX:'center', originY:'center' }); canvas.add(s); return s;
+}
 
 const TEMPLATES = [
-  { id:'sale',     title:'Mega Sale',         sub:'50% OFF',             cat:'Marketing', pro:false, bg:['#ef4444','#f97316'] },
-  { id:'quote',    title:'Daily Quote',       sub:'Motivation post',     cat:'Social Media', pro:false, bg:['#fef3c7','#f59e0b'] },
-  { id:'business', title:'Grow Business',     sub:'Promo post',          cat:'Marketing', pro:false, bg:['#0f172a','#155e75'] },
-  { id:'food',     title:'Tasty Burger',      sub:'Food offer',          cat:'Marketing', pro:false, bg:['#f59e0b','#ef4444'] },
-  { id:'estate',   title:'House For Sale',    sub:'Real estate',         cat:'Marketing', pro:false, bg:['#1d4ed8','#06b6d4'] },
-  { id:'edu',      title:'Admissions Open',   sub:'School / institute',  cat:'Education', pro:false, bg:['#8b3dff','#4f46e5'] },
-  { id:'motivate', title:'Think Big',         sub:'Success quote',       cat:'Social Media', pro:false, bg:['#111827','#000000'] },
-  { id:'story',    title:'Flash Sale Story',  sub:'Story format',        cat:'Social Media', pro:false, bg:['#db2777','#7c3aed'] },
-  { id:'course',   title:'Online Course',     sub:'Course promo',        cat:'Education', pro:false, bg:['#0ea5e9','#22c55e'] },
-  { id:'menu',     title:'Restaurant Menu',   sub:'Menu header',         cat:'Marketing', pro:false, bg:['#292524','#78350f'] },
-  { id:'birthday', title:'Happy Birthday',    sub:'Birthday wish',       cat:'Events', pro:true, bg:['#8b3dff','#ec4899'] },
-  { id:'yt',       title:'YouTube Thumbnail', sub:'Make money online',   cat:'Video', pro:true, bg:['#111827','#374151'] },
-  { id:'eid',      title:'Eid Mubarak',       sub:'Greeting card',       cat:'Events', pro:true, bg:['#065f46','#10b981'] },
-  { id:'fashion',  title:'New Collection',    sub:'Fashion sale',        cat:'Social Media', pro:true, bg:['#e7d8c9','#c9a887'] },
-  { id:'wedding',  title:'Wedding Invite',    sub:'Ayesha & Ahmed',      cat:'Events', pro:true, bg:['#fdf6ec','#e8c39e'] },
-  { id:'gym',      title:'Fitness Gym',       sub:'No pain no gain',     cat:'Marketing', pro:true, bg:['#18181b','#dc2626'] },
-  { id:'travel',   title:'Travel Pakistan',   sub:'Hunza valley trip',   cat:'Social Media', pro:true, bg:['#0369a1','#2dd4bf'] },
-  { id:'music',    title:'Music Night Live',  sub:'Concert poster',      cat:'Events', pro:true, bg:['#1e1b4b','#db2777'] },
-  { id:'baby',     title:'Baby Shower',       sub:'Welcome baby',        cat:'Events', pro:true, bg:['#fbcfe8','#93c5fd'] },
-  { id:'vlog',     title:'My Daily Vlog',     sub:'Vlog thumbnail',      cat:'Video', pro:true, bg:['#f97316','#db2777'] },
+  { id:'sale',     title:'Mega Sale',         sub:'50% OFF',             cat:'Marketing',    pro:false, size:'ig-post',  bg:['#ef4444','#f97316'] },
+  { id:'quote',    title:'Daily Quote',       sub:'Motivation post',     cat:'Social Media', pro:false, size:'ig-post',  bg:['#fef3c7','#f59e0b'] },
+  { id:'business', title:'Grow Business',     sub:'Promo post',          cat:'Marketing',    pro:false, size:'ig-post',  bg:['#0f172a','#155e75'] },
+  { id:'food',     title:'Tasty Burger',      sub:'Food offer',          cat:'Marketing',    pro:false, size:'ig-post',  bg:['#f59e0b','#ef4444'] },
+  { id:'estate',   title:'House For Sale',    sub:'Real estate',         cat:'Marketing',    pro:false, size:'fb-post',  bg:['#1d4ed8','#06b6d4'] },
+  { id:'edu',      title:'Admissions Open',   sub:'School / institute',  cat:'Education',    pro:false, size:'ig-post',  bg:['#8b3dff','#4f46e5'] },
+  { id:'motivate', title:'Think Big',         sub:'Success quote',       cat:'Social Media', pro:false, size:'ig-post',  bg:['#111827','#000000'] },
+  { id:'story',    title:'Flash Sale Story',  sub:'Story format',        cat:'Social Media', pro:false, size:'ig-story', bg:['#db2777','#7c3aed'] },
+  { id:'course',   title:'Online Course',     sub:'Course promo',        cat:'Education',    pro:false, size:'ig-post',  bg:['#0ea5e9','#22c55e'] },
+  { id:'menu',     title:'Restaurant Menu',   sub:'Menu header',         cat:'Marketing',    pro:false, size:'poster',   bg:['#292524','#78350f'] },
+  { id:'job',      title:'Job Vacancy',       sub:'We are hiring',       cat:'Marketing',    pro:false, size:'fb-post',  bg:['#1e3a8a','#0ea5e9'] },
+  { id:'ramadan',  title:'Ramadan Kareem',    sub:'Blessed month',       cat:'Events',       pro:false, size:'ig-post',  bg:['#1e1b4b','#7c3aed'] },
+  { id:'mobile',   title:'Mobile Shop Sale',  sub:'Latest smartphones',  cat:'Marketing',    pro:false, size:'ig-post',  bg:['#0f172a','#6d28d9'] },
+  { id:'webinar',  title:'Live Webinar',      sub:'Free online session', cat:'Education',    pro:false, size:'pres',     bg:['#7c2d12','#ea580c'] },
+  { id:'bakery',   title:'Fresh Bakery',      sub:'Baked fresh daily',   cat:'Marketing',    pro:false, size:'ig-post',  bg:['#fff7ed','#fdba74'] },
+  { id:'birthday', title:'Happy Birthday',    sub:'Birthday wish',       cat:'Events',       pro:true,  size:'ig-post',  bg:['#8b3dff','#ec4899'] },
+  { id:'yt',       title:'YouTube Thumbnail', sub:'Make money online',   cat:'Video',        pro:true,  size:'yt-thumb', bg:['#111827','#374151'] },
+  { id:'eid',      title:'Eid Mubarak',       sub:'Greeting card',       cat:'Events',       pro:true,  size:'ig-post',  bg:['#065f46','#10b981'] },
+  { id:'fashion',  title:'New Collection',    sub:'Fashion sale',        cat:'Social Media', pro:true,  size:'ig-post',  bg:['#e7d8c9','#c9a887'] },
+  { id:'wedding',  title:'Wedding Invite',    sub:'Ayesha & Ahmed',      cat:'Events',       pro:true,  size:'poster',   bg:['#fdf6ec','#e8c39e'] },
+  { id:'gym',      title:'Fitness Gym',       sub:'No pain no gain',     cat:'Marketing',    pro:true,  size:'ig-post',  bg:['#18181b','#dc2626'] },
+  { id:'travel',   title:'Travel Pakistan',   sub:'Hunza valley trip',   cat:'Social Media', pro:true,  size:'ig-post',  bg:['#0369a1','#2dd4bf'] },
+  { id:'music',    title:'Music Night Live',  sub:'Concert poster',      cat:'Events',       pro:true,  size:'poster',   bg:['#1e1b4b','#db2777'] },
+  { id:'baby',     title:'Baby Shower',       sub:'Welcome baby',        cat:'Events',       pro:true,  size:'ig-post',  bg:['#fbcfe8','#93c5fd'] },
+  { id:'vlog',     title:'My Daily Vlog',     sub:'Vlog thumbnail',      cat:'Video',        pro:true,  size:'yt-thumb', bg:['#f97316','#db2777'] },
+  { id:'cricket',  title:'Cricket Match Day', sub:'Match announcement',  cat:'Events',       pro:true,  size:'ig-post',  bg:['#14532d','#22c55e'] },
+  { id:'salon',    title:'Beauty Salon',      sub:'Salon offer',         cat:'Marketing',    pro:true,  size:'ig-post',  bg:['#fdf2f8','#f9a8d4'] },
+  { id:'car',      title:'Car For Sale',      sub:'Used car deal',       cat:'Marketing',    pro:true,  size:'fb-post',  bg:['#111827','#b45309'] },
+  { id:'result',   title:'Result Day',        sub:'Topper announcement', cat:'Education',    pro:true,  size:'ig-post',  bg:['#fefce8','#eab308'] },
+  { id:'podcast',  title:'Podcast Cover',     sub:'New episode',         cat:'Video',        pro:true,  size:'ig-post',  bg:['#18181b','#7c3aed'] },
 ];
 const BUILDERS = {
-  sale(){ gradRect('#ef4444','#f97316'); const W=currentSize.w;
-    addAt(T('MEGA SALE', { fontFamily:'Bebas Neue', fontSize:W*.16, fill:'#fff', fontWeight:700, width:W*.9 }), .5, .14);
-    addAt(T('50% OFF', { fontFamily:'Anton', fontSize:W*.24, fill:'#facc15', width:W*.9, shadow:new fabric.Shadow({color:'rgba(0,0,0,.3)',blur:6,offsetX:4,offsetY:5}) }), .5, .34);
-    addAt(T('On Everything — Limited Time Offer!', { fontFamily:'Inter', fontSize:W*.032, fill:'#fff', width:W*.85 }), .5, .62);
-    const btn = new fabric.Rect({ width:W*.42, height:W*.1, fill:'#0d1216', rx:40, ry:40, name:'Button' }); addAt(btn, .5, .76);
-    addAt(T('SHOP NOW', { fontFamily:'Poppins', fontSize:W*.04, fill:'#fff', fontWeight:700, width:W*.42 }), .5, .785); },
-  quote(){ solidBg('#fef9ec'); const W=currentSize.w;
-    addAt(T('“', { fontFamily:'Playfair Display', fontSize:W*.3, fill:'#f59e0b', width:W*.4 }), .5, .05);
-    addAt(T('Stay positive,\nwork hard,\nmake it happen.', { fontFamily:'Playfair Display', fontSize:W*.075, fill:'#1c1917', fontWeight:700, width:W*.82, lineHeight:1.2 }), .5, .36);
-    addAt(T('— DAILY MOTIVATION', { fontFamily:'Montserrat', fontSize:W*.026, fill:'#92400e', width:W*.7 }), .5, .78); },
-  business(){ gradRect('#0f172a','#155e75'); const W=currentSize.w;
-    const bar = new fabric.Rect({ width:W*.16, height:W*.014, fill:'#22d3ee', name:'Accent' }); addAt(bar, .5, .16);
-    addAt(T('GROW YOUR\nBUSINESS', { fontFamily:'Montserrat', fontSize:W*.105, fill:'#fff', fontWeight:900, width:W*.88, lineHeight:1.1 }), .5, .24);
-    addAt(T('Professional services that bring you more customers, more sales, more growth.', { fontFamily:'Inter', fontSize:W*.03, fill:'#a5f3fc', width:W*.8 }), .5, .58);
-    addAt(T('📞 0300-1234567   🌐 yourwebsite.com', { fontFamily:'Poppins', fontSize:W*.032, fill:'#fff', fontWeight:600, width:W*.85 }), .5, .8); },
-  food(){ gradRect('#f59e0b','#ef4444'); const W=currentSize.w;
-    addAt(new fabric.Text('🍔', { fontSize:W*.34, name:'Sticker' }), .5, .07);
-    addAt(T('TASTY BURGER', { fontFamily:'Anton', fontSize:W*.13, fill:'#fff', width:W*.92 }), .5, .5);
-    addAt(T('Juicy • Fresh • Delicious', { fontFamily:'Pacifico', fontSize:W*.045, fill:'#fef3c7', width:W*.85 }), .5, .66);
-    addAt(T('Only Rs 499 — Order Now!', { fontFamily:'Poppins', fontSize:W*.038, fill:'#fff', fontWeight:700, width:W*.85 }), .5, .78); },
-  estate(){ gradRect('#1d4ed8','#06b6d4'); const W=currentSize.w;
-    addAt(new fabric.Text('🏠', { fontSize:W*.26, name:'Sticker' }), .5, .07);
-    addAt(T('HOUSE FOR SALE', { fontFamily:'Montserrat', fontSize:W*.1, fill:'#fff', fontWeight:900, width:W*.92 }), .5, .42);
-    addAt(T('3 Bed • 2 Bath • Prime Location', { fontFamily:'Inter', fontSize:W*.034, fill:'#dbeafe', width:W*.85 }), .5, .58);
-    addAt(T('Call: 0300-1234567', { fontFamily:'Poppins', fontSize:W*.042, fill:'#facc15', fontWeight:700, width:W*.85 }), .5, .72); },
-  edu(){ solidBg('#ffffff'); const W=currentSize.w;
-    const band = new fabric.Rect({ left:0, top:0, width:W, height:currentSize.h*.3, fill:'#8b3dff', selectable:false, name:'Header Band' }); canvas.add(band);
-    addAt(T('🎓 ADMISSIONS OPEN', { fontFamily:'Poppins', fontSize:W*.082, fill:'#fff', fontWeight:800, width:W*.94 }), .5, .09);
-    addAt(T('Session 2026 – 27', { fontFamily:'Montserrat', fontSize:W*.045, fill:'#4c1d95', fontWeight:700, width:W*.85 }), .5, .42);
-    addAt(T('Limited seats — experienced teachers,\nmodern labs and affordable fees.', { fontFamily:'Inter', fontSize:W*.032, fill:'#334155', width:W*.82, lineHeight:1.35 }), .5, .55);
-    addAt(T('Enroll Now: 0300-1234567', { fontFamily:'Poppins', fontSize:W*.04, fill:'#8b3dff', fontWeight:700, width:W*.85 }), .5, .8); },
-  motivate(){ solidBg('#0a0a0a'); const W=currentSize.w;
-    addAt(T('THINK', { fontFamily:'Anton', fontSize:W*.2, fill:'#fff', width:W*.9 }), .5, .2);
-    addAt(T('BIG.', { fontFamily:'Anton', fontSize:W*.2, fill:'#facc15', width:W*.9 }), .5, .42);
-    addAt(T('Your only limit is your mindset.', { fontFamily:'Inter', fontSize:W*.032, fill:'#d4d4d8', width:W*.8 }), .5, .68);
-    addAt(T('@yourpage', { fontFamily:'Montserrat', fontSize:W*.024, fill:'#71717a', width:W*.6 }), .5, .8); },
-  story(){ gradRect('#db2777','#7c3aed'); const W=currentSize.w;
-    addAt(T('FLASH', { fontFamily:'Anton', fontSize:W*.17, fill:'#fff', width:W*.92 }), .5, .16);
-    addAt(T('SALE ⚡', { fontFamily:'Anton', fontSize:W*.17, fill:'#fde047', width:W*.92 }), .5, .3);
-    addAt(T('UP TO 70% OFF\nToday only — swipe up!', { fontFamily:'Poppins', fontSize:W*.04, fill:'#fff', fontWeight:600, width:W*.85, lineHeight:1.3 }), .5, .52);
-    addAt(new fabric.Text('🛍️', { fontSize:W*.2, name:'Sticker' }), .5, .72); },
-  course(){ gradRect('#0ea5e9','#22c55e'); const W=currentSize.w;
-    addAt(new fabric.Text('💻', { fontSize:W*.2, name:'Sticker' }), .5, .08);
-    addAt(T('LEARN WEB\nDEVELOPMENT', { fontFamily:'Montserrat', fontSize:W*.095, fill:'#fff', fontWeight:900, width:W*.9, lineHeight:1.12 }), .5, .34);
-    addAt(T('Complete online course — beginner to pro, with certificate.', { fontFamily:'Inter', fontSize:W*.03, fill:'#ecfeff', width:W*.82 }), .5, .62);
-    addAt(T('Enroll Today — Rs 2,999 only', { fontFamily:'Poppins', fontSize:W*.036, fill:'#fef08a', fontWeight:700, width:W*.85 }), .5, .76); },
-  menu(){ solidBg('#1c1917'); const W=currentSize.w;
-    addAt(T('— THE FOOD HOUSE —', { fontFamily:'Montserrat', fontSize:W*.026, fill:'#d6d3d1', width:W*.8 }), .5, .1);
-    addAt(T('Our Menu', { fontFamily:'Playfair Display', fontSize:W*.13, fill:'#fbbf24', fontWeight:700, width:W*.9 }), .5, .2);
-    addAt(T('Burgers · Pizza · BBQ · Fast Food\nFresh & hot, every day 12pm – 12am', { fontFamily:'Inter', fontSize:W*.032, fill:'#e7e5e4', width:W*.82, lineHeight:1.45 }), .5, .42);
-    addAt(new fabric.Text('🍕', { fontSize:W*.18, name:'Sticker' }), .3, .68);
-    addAt(new fabric.Text('🍟', { fontSize:W*.18, name:'Sticker' }), .7, .68); },
-  birthday(){ gradRect('#8b3dff','#ec4899'); const W=currentSize.w;
-    addAt(new fabric.Text('🎉', { fontSize:W*.15, name:'Sticker' }), .17, .06);
-    addAt(new fabric.Text('🎂', { fontSize:W*.15, name:'Sticker' }), .83, .06);
-    addAt(T('Happy Birthday', { fontFamily:'Pacifico', fontSize:W*.115, fill:'#fff', width:W*.92 }), .5, .3);
-    addAt(T('TO YOU!', { fontFamily:'Anton', fontSize:W*.09, fill:'#fde68a', width:W*.9 }), .5, .47);
-    addAt(T('Wishing you a day full of happiness,\ncake and wonderful surprises.', { fontFamily:'Inter', fontSize:W*.03, fill:'#fce7f3', width:W*.82, lineHeight:1.35 }), .5, .62); },
-  yt(){ gradRect('#111827','#374151'); const W=currentSize.w;
-    addAt(T('HOW TO', { fontFamily:'Anton', fontSize:W*.16, fill:'#fff', width:W*.9 }), .5, .12);
-    addAt(T('MAKE MONEY', { fontFamily:'Anton', fontSize:W*.16, fill:'#facc15', width:W*.9 }), .5, .33);
-    addAt(T('ONLINE 💰', { fontFamily:'Anton', fontSize:W*.12, fill:'#fff', width:W*.9 }), .5, .54);
-    const play = new fabric.Circle({ radius:W*.065, fill:'#ef4444', name:'Play Button' }); addAt(play, .5, .8);
-    addAt(new fabric.Text('▶', { fontSize:W*.065, fill:'#fff', name:'Sticker' }), .515, .825); },
-  eid(){ gradRect('#065f46','#10b981'); const W=currentSize.w;
-    addAt(new fabric.Text('🌙', { fontSize:W*.2, name:'Sticker' }), .5, .07);
-    addAt(T('Eid Mubarak', { fontFamily:'Playfair Display', fontSize:W*.12, fill:'#fff', fontWeight:700, width:W*.92 }), .5, .36);
-    addAt(T('May your life be filled with\npeace, joy and blessings.', { fontFamily:'Inter', fontSize:W*.033, fill:'#d1fae5', width:W*.82, lineHeight:1.4 }), .5, .56);
-    addAt(T('— From our family to yours', { fontFamily:'Dancing Script', fontSize:W*.05, fill:'#fde68a', width:W*.85 }), .5, .76); },
-  fashion(){ solidBg('#f3ead9'); const W=currentSize.w;
-    const circ = new fabric.Circle({ radius:W*.2, fill:'#c9a887', name:'Circle Frame' }); addAt(circ, .5, .1);
-    addAt(new fabric.Text('👗', { fontSize:W*.16, name:'Sticker' }), .5, .19);
-    addAt(T('NEW COLLECTION', { fontFamily:'Playfair Display', fontSize:W*.088, fill:'#3f2f1d', fontWeight:700, width:W*.92 }), .5, .56);
-    addAt(T('Fashion Sale 2026 — Up to 40% Off', { fontFamily:'Montserrat', fontSize:W*.03, fill:'#7c5c36', width:W*.85 }), .5, .7); },
-  wedding(){ solidBg('#fdf8ef'); const W=currentSize.w;
-    const fr = new fabric.Rect({ left:W*.06, top:currentSize.h*.06, width:W*.88, height:currentSize.h*.88, fill:'transparent', stroke:'#c9a227', strokeWidth:3, name:'Gold Frame' }); canvas.add(fr);
-    addAt(T('THE WEDDING OF', { fontFamily:'Montserrat', fontSize:W*.024, fill:'#92710c', width:W*.7 }), .5, .14);
-    addAt(T('Ayesha & Ahmed', { fontFamily:'Dancing Script', fontSize:W*.11, fill:'#7c5a10', width:W*.9 }), .5, .26);
-    addAt(T('Saturday, 20 December 2026\nVenue: Royal Palm Hall · 7 PM onwards', { fontFamily:'Playfair Display', fontSize:W*.032, fill:'#57534e', width:W*.8, lineHeight:1.4 }), .5, .52);
-    addAt(T('💍', { fontSize:W*.08, name:'Sticker' }), .5, .74); },
-  gym(){ gradRect('#18181b','#7f1d1d'); const W=currentSize.w;
-    addAt(new fabric.Text('🏋️', { fontSize:W*.2, name:'Sticker' }), .5, .07);
-    addAt(T('NO PAIN', { fontFamily:'Anton', fontSize:W*.15, fill:'#fff', width:W*.92 }), .5, .36);
-    addAt(T('NO GAIN', { fontFamily:'Anton', fontSize:W*.15, fill:'#ef4444', width:W*.92 }), .5, .52);
-    addAt(T('Join Fitness Gym today — first month Rs 1,500', { fontFamily:'Poppins', fontSize:W*.03, fill:'#e4e4e7', fontWeight:600, width:W*.85 }), .5, .72); },
-  travel(){ gradRect('#0369a1','#2dd4bf'); const W=currentSize.w;
-    addAt(new fabric.Text('🏔️', { fontSize:W*.22, name:'Sticker' }), .5, .07);
-    addAt(T('EXPLORE\nHUNZA VALLEY', { fontFamily:'Montserrat', fontSize:W*.1, fill:'#fff', fontWeight:900, width:W*.9, lineHeight:1.12 }), .5, .36);
-    addAt(T('3-day guided trip · Hotel · Transport · Food\nStarting Rs 24,999 per person', { fontFamily:'Inter', fontSize:W*.03, fill:'#ecfeff', width:W*.84, lineHeight:1.4 }), .5, .64); },
-  music(){ gradRect('#1e1b4b','#db2777'); const W=currentSize.w;
-    addAt(new fabric.Text('🎵', { fontSize:W*.18, name:'Sticker' }), .5, .07);
-    addAt(T('MUSIC NIGHT', { fontFamily:'Bebas Neue', fontSize:W*.15, fill:'#fff', width:W*.92 }), .5, .32);
-    addAt(T('LIVE IN CONCERT', { fontFamily:'Montserrat', fontSize:W*.05, fill:'#fbcfe8', fontWeight:700, width:W*.85 }), .5, .5);
-    addAt(T('Sat · 9 PM · City Arena — Tickets at door', { fontFamily:'Inter', fontSize:W*.03, fill:'#e0e7ff', width:W*.85 }), .5, .66); },
-  baby(){ solidBg('#fdf2f8'); const W=currentSize.w;
-    addAt(new fabric.Text('👶', { fontSize:W*.2, name:'Sticker' }), .5, .08);
-    addAt(T('Baby Shower', { fontFamily:'Pacifico', fontSize:W*.11, fill:'#db2777', width:W*.92 }), .5, .36);
-    addAt(T('Welcome to the world, little one!\nJoin us to celebrate — Sunday 4 PM', { fontFamily:'Inter', fontSize:W*.032, fill:'#6d28d9', width:W*.84, lineHeight:1.4 }), .5, .56); },
-  vlog(){ gradRect('#f97316','#db2777'); const W=currentSize.w;
-    addAt(T('MY DAILY', { fontFamily:'Anton', fontSize:W*.16, fill:'#fff', width:W*.9 }), .5, .14);
-    addAt(T('VLOG 📹', { fontFamily:'Anton', fontSize:W*.16, fill:'#fef08a', width:W*.9 }), .5, .36);
-    addAt(T('A day in my life — watch till the end!', { fontFamily:'Poppins', fontSize:W*.034, fill:'#fff', fontWeight:600, width:W*.85 }), .5, .6); },
+  sale(){ gradRect('#ef4444','#f97316'); const W = currentSize.w;
+    deco(.06, .04, .16, '#ffffff', .12); deco(.97, .8, .2, '#7f1d1d', .18); deco(.9, .06, .07, '#fde047', .5);
+    addAt(T('MEGA SALE', { fontFamily:'Bebas Neue', fontSize:W*.155, fill:'#fff', fontWeight:700, width:W*.92 }), .5, .1);
+    badge('50%\nOFF', .82, .3, .3, '#facc15', '#7f1d1d');
+    addAt(T('On Everything — Limited Time Offer!', { fontFamily:'Inter', fontSize:W*.033, fill:'#fff', width:W*.8 }), .34, .44);
+    hline(.34, .55, .3, '#fde047', 5);
+    addAt(T('Fashion · Electronics · Home & More', { fontFamily:'Poppins', fontSize:W*.028, fill:'#ffedd5', width:W*.8 }), .34, .6);
+    pill('SHOP NOW', .5, .76, .44, '#0d1216', '#fff', .04);
+    addAt(T('www.yourshop.com', { fontFamily:'Montserrat', fontSize:W*.024, fill:'#ffe4e6', width:W*.7 }), .5, .9); },
+  quote(){ solidBg('#fef9ec'); const W = currentSize.w;
+    deco(.92, .02, .13, '#f59e0b', .16); deco(.02, .86, .1, '#f59e0b', .12);
+    addAt(T('“', { fontFamily:'Playfair Display', fontSize:W*.3, fill:'#f59e0b', width:W*.4 }), .5, .04);
+    addAt(T('Stay positive,\nwork hard,\nmake it happen.', { fontFamily:'Playfair Display', fontSize:W*.078, fill:'#1c1917', fontWeight:700, width:W*.84, lineHeight:1.2 }), .5, .34);
+    hline(.5, .72, .16, '#f59e0b', 4);
+    addAt(T('— DAILY MOTIVATION', { fontFamily:'Montserrat', fontSize:W*.026, fill:'#92400e', width:W*.7, charSpacing: 120 }), .5, .78); },
+  business(){ const W = currentSize.w;
+    const p = addPhoto(PH('concert'), 0, 0, 1, 1, 0);
+    shade(0, 0, 1, 1, '#0f172a', .78);
+    const bar = new fabric.Rect({ width:W*.16, height:W*.014, fill:'#22d3ee', name:'Accent' }); addAt(bar, .5, .14);
+    addAt(T('GROW YOUR\nBUSINESS', { fontFamily:'Montserrat', fontSize:W*.105, fill:'#fff', fontWeight:900, width:W*.88, lineHeight:1.1 }), .5, .22);
+    addAt(T('Professional services that bring you more customers, more sales, more growth.', { fontFamily:'Inter', fontSize:W*.031, fill:'#cffafe', width:W*.8, lineHeight:1.4 }), .5, .52);
+    pill('GET A FREE QUOTE', .5, .68, .52, '#0891b2', '#fff', .032);
+    addAt(T('Call 0300-1234567  ·  yourwebsite.com', { fontFamily:'Poppins', fontSize:W*.03, fill:'#fff', fontWeight:600, width:W*.86 }), .5, .84);
+    return p; },
+  food(){ gradRect('#f59e0b','#dc2626'); const W = currentSize.w;
+    deco(.04, .06, .12, '#ffffff', .14); deco(.95, .12, .08, '#fde047', .55);
+    pill('NEW ARRIVAL', .5, .07, .4, '#7f1d1d', '#fde68a', .03);
+    addAt(T('TASTY\nBURGER', { fontFamily:'Anton', fontSize:W*.17, fill:'#fff', width:W*.94, lineHeight:1.05 }), .5, .17);
+    addAt(T('Juicy · Fresh · Delicious', { fontFamily:'Pacifico', fontSize:W*.048, fill:'#fef3c7', width:W*.86 }), .5, .5);
+    badge('Rs 499\nONLY', .8, .58, .28, '#fef08a', '#7f1d1d');
+    addAt(T('Free home delivery within city', { fontFamily:'Inter', fontSize:W*.03, fill:'#fff7ed', width:W*.62 }), .36, .64);
+    pill('ORDER NOW — 0300-1234567', .5, .82, .66, '#0d1216', '#fff', .032); },
+  estate(){ const W = currentSize.w;
+    const p = addPhoto(PH('hunza'), 0, 0, .52, 1, 0);
+    shade(.52, 0, .48, 1, '#1e3a8a', 1);
+    addAt(T('HOUSE\nFOR SALE', { fontFamily:'Montserrat', fontSize:W*.075, fill:'#fff', fontWeight:900, width:W*.42, lineHeight:1.12 }), .76, .1);
+    hline(.76, .3, .2, '#facc15', 5);
+    addAt(T('3 Bed · 2 Bath\nPrime Location\nReady to Move', { fontFamily:'Inter', fontSize:W*.026, fill:'#dbeafe', width:W*.4, lineHeight:1.5 }), .76, .38);
+    badge('Rs 85\nLAC', .76, .58, .2, '#facc15', '#1e3a8a');
+    addAt(T('Call: 0300-1234567', { fontFamily:'Poppins', fontSize:W*.026, fill:'#fff', fontWeight:700, width:W*.42 }), .76, .82);
+    return p; },
+  edu(){ solidBg('#ffffff'); const W = currentSize.w, H = currentSize.h;
+    const band = new fabric.Rect({ left:0, top:0, width:W, height:H*.3, fill:'#8b3dff', selectable:false, name:'Header Band' }); canvas.add(band);
+    deco(.9, -.04, .12, '#ffffff', .15);
+    addAt(T('ADMISSIONS OPEN', { fontFamily:'Poppins', fontSize:W*.078, fill:'#fff', fontWeight:800, width:W*.94 }), .5, .08);
+    addAt(T('Session 2026 – 27 · Playgroup to Matric', { fontFamily:'Montserrat', fontSize:W*.03, fill:'#ede9fe', width:W*.9 }), .5, .2);
+    addAt(T('Why choose us?', { fontFamily:'Poppins', fontSize:W*.042, fill:'#4c1d95', fontWeight:700, width:W*.85 }), .5, .38);
+    addAt(T('Experienced teachers\nModern computer & science labs\nAffordable monthly fees', { fontFamily:'Inter', fontSize:W*.033, fill:'#334155', width:W*.8, lineHeight:1.5 }), .5, .48);
+    pill('ENROLL NOW — 0300-1234567', .5, .76, .68, '#8b3dff', '#fff', .034);
+    addAt(T('Limited seats available', { fontFamily:'Inter', fontSize:W*.026, fill:'#64748b', width:W*.7 }), .5, .88); },
+  motivate(){ solidBg('#0a0a0a'); const W = currentSize.w;
+    deco(.5, .3, .34, '#facc15', .07);
+    addAt(T('THINK', { fontFamily:'Anton', fontSize:W*.21, fill:'#fff', width:W*.92 }), .5, .16);
+    addAt(T('BIG.', { fontFamily:'Anton', fontSize:W*.21, fill:'#facc15', width:W*.92 }), .5, .39);
+    hline(.5, .64, .14, '#facc15', 5);
+    addAt(T('Your only limit is your mindset.', { fontFamily:'Inter', fontSize:W*.033, fill:'#d4d4d8', width:W*.82 }), .5, .7);
+    addAt(T('@yourpage', { fontFamily:'Montserrat', fontSize:W*.024, fill:'#71717a', width:W*.6 }), .5, .82); },
+  story(){ const W = currentSize.w, H = currentSize.h;
+    const p = addPhoto(PH('mic'), 0, 0, 1, 1, 0);
+    shade(0, .52, 1, .48, '#7c3aed', .88);
+    shade(0, 0, 1, .3, '#db2777', .55);
+    addAt(T('FLASH', { fontFamily:'Anton', fontSize:W*.19, fill:'#fff', width:W*.94 }), .5, .12);
+    addAt(T('SALE', { fontFamily:'Anton', fontSize:W*.19, fill:'#fde047', width:W*.94 }), .5, .24);
+    badge('70%\nOFF', .5, .42, .3, '#fde047', '#831843');
+    addAt(T('Today only — order before midnight!', { fontFamily:'Poppins', fontSize:W*.04, fill:'#fff', fontWeight:600, width:W*.86 }), .5, .66);
+    pill('SHOP NOW ↓', .5, .76, .5, '#ffffff', '#9d174d', .038);
+    return p; },
+  course(){ gradRect('#0369a1','#22c55e'); const W = currentSize.w;
+    deco(.95, .05, .15, '#ffffff', .13); deco(.03, .85, .1, '#fef08a', .3);
+    pill('ONLINE COURSE', .5, .08, .44, '#fef08a', '#14532d', .03);
+    addAt(T('LEARN WEB\nDEVELOPMENT', { fontFamily:'Montserrat', fontSize:W*.098, fill:'#fff', fontWeight:900, width:W*.92, lineHeight:1.12 }), .5, .2);
+    addAt(T('Complete course — beginner to pro, with certificate and lifetime access.', { fontFamily:'Inter', fontSize:W*.031, fill:'#ecfeff', width:W*.82, lineHeight:1.4 }), .5, .47);
+    hline(.5, .63, .2, '#fef08a', 4);
+    addAt(T('40+ lessons · Urdu language · Certificate', { fontFamily:'Poppins', fontSize:W*.028, fill:'#f0fdf4', width:W*.86 }), .5, .68);
+    pill('ENROLL TODAY — Rs 2,999 ONLY', .5, .78, .7, '#0d1216', '#fff', .032); },
+  menu(){ solidBg('#1c1917'); const W = currentSize.w;
+    const fr = new fabric.Rect({ left:W*.045, top:currentSize.h*.045, width:W*.91, height:currentSize.h*.91, fill:'transparent', stroke:'#b45309', strokeWidth:2, name:'Frame' }); canvas.add(fr);
+    addAt(T('— THE FOOD HOUSE —', { fontFamily:'Montserrat', fontSize:W*.026, fill:'#d6d3d1', width:W*.8, charSpacing: 150 }), .5, .1);
+    addAt(T('Our Menu', { fontFamily:'Playfair Display', fontSize:W*.12, fill:'#fbbf24', fontWeight:700, width:W*.9 }), .5, .17);
+    hline(.5, .32, .12, '#b45309', 3);
+    addAt(T('STARTERS', { fontFamily:'Montserrat', fontSize:W*.03, fill:'#fbbf24', fontWeight:700, width:W*.7 }), .5, .38);
+    addAt(T('Soup of the Day ····· Rs 350\nGarlic Bread ····· Rs 250', { fontFamily:'Inter', fontSize:W*.027, fill:'#e7e5e4', width:W*.74, lineHeight:1.5 }), .5, .43);
+    addAt(T('MAIN COURSE', { fontFamily:'Montserrat', fontSize:W*.03, fill:'#fbbf24', fontWeight:700, width:W*.7 }), .5, .56);
+    addAt(T('Chicken Karahi ····· Rs 1,450\nBBQ Platter ····· Rs 1,850\nBiryani Special ····· Rs 450', { fontFamily:'Inter', fontSize:W*.027, fill:'#e7e5e4', width:W*.74, lineHeight:1.5 }), .5, .61);
+    addAt(T('Open daily 12 PM – 12 AM · 0300-1234567', { fontFamily:'Poppins', fontSize:W*.024, fill:'#a8a29e', width:W*.8 }), .5, .85); },
+  job(){ gradRect('#1e3a8a','#0284c7'); const W = currentSize.w;
+    pill('WE ARE HIRING', .5, .12, .46, '#facc15', '#1e3a8a', .034);
+    addAt(T('SALES EXECUTIVE', { fontFamily:'Montserrat', fontSize:W*.052, fill:'#fff', fontWeight:900, width:W*.9 }), .5, .3);
+    addAt(T('2 Positions · Full Time · Umerkot', { fontFamily:'Inter', fontSize:W*.024, fill:'#bae6fd', width:W*.85 }), .5, .44);
+    hline(.5, .55, .2, '#facc15', 4);
+    addAt(T('Good salary + commission\nExperience preferred, fresh can also apply', { fontFamily:'Inter', fontSize:W*.024, fill:'#e0f2fe', width:W*.85, lineHeight:1.45 }), .5, .62);
+    pill('APPLY: 0300-1234567', .5, .8, .56, '#ffffff', '#1e3a8a', .03); },
+  ramadan(){ const W = currentSize.w;
+    const p = addPhoto(PH('mountain'), 0, 0, 1, 1, 0);
+    shade(0, 0, 1, 1, '#1e1b4b', .45);
+    addAt(T('Ramadan', { fontFamily:'Playfair Display', fontSize:W*.13, fill:'#fff', fontWeight:700, width:W*.94 }), .5, .3);
+    addAt(T('KAREEM', { fontFamily:'Montserrat', fontSize:W*.075, fill:'#fde68a', fontWeight:800, width:W*.9, charSpacing: 300 }), .5, .46);
+    hline(.5, .58, .18, '#fde68a', 3);
+    addAt(T('May this blessed month bring peace,\nmercy and blessings to your home.', { fontFamily:'Inter', fontSize:W*.03, fill:'#e0e7ff', width:W*.84, lineHeight:1.45 }), .5, .64);
+    return p; },
+  mobile(){ solidBg('#0f172a'); const W = currentSize.w, H = currentSize.h;
+    deco(.92, .02, .16, '#7c3aed', .35); deco(.02, .88, .12, '#2563eb', .3);
+    const phone = new fabric.Rect({ left: W*.6, top: H*.12, width: W*.27, height: H*.62, fill:'#1e293b', stroke:'#7c3aed', strokeWidth:3, rx: W*.03, ry: W*.03, name:'Phone' }); canvas.add(phone);
+    const scr = new fabric.Rect({ left: W*.635, top: H*.17, width: W*.2, height: H*.44, fill:'#312e81', name:'Screen' }); canvas.add(scr);
+    addAt(T('LATEST\nSMARTPHONES', { fontFamily:'Montserrat', fontSize:W*.082, fill:'#fff', fontWeight:900, width:W*.52, lineHeight:1.15 }), .3, .14);
+    addAt(T('All brands available\nEasy installments · Official warranty', { fontFamily:'Inter', fontSize:W*.028, fill:'#cbd5e1', width:W*.5, lineHeight:1.45 }), .3, .42);
+    badge('UP TO\n30% OFF', .3, .58, .3, '#facc15', '#1e1b4b');
+    pill('VISIT OUR SHOP TODAY', .5, .84, .6, '#7c3aed', '#fff', .032); },
+  webinar(){ gradRect('#7c2d12','#ea580c'); const W = currentSize.w;
+    pill('● LIVE WEBINAR', .24, .1, .34, '#dc2626', '#fff', .03);
+    addAt(T('DIGITAL MARKETING\nMASTERCLASS', { fontFamily:'Montserrat', fontSize:W*.062, fill:'#fff', fontWeight:900, width:W*.9, lineHeight:1.15 }), .5, .2);
+    addAt(T('Learn how to grow any business online — Facebook ads, WhatsApp selling and more.', { fontFamily:'Inter', fontSize:W*.026, fill:'#ffedd5', width:W*.84, lineHeight:1.45 }), .5, .42);
+    pill('SUNDAY · 8 PM · FREE ENTRY', .5, .58, .5, '#fff', '#9a3412', .03);
+    addAt(T('Register on WhatsApp: 0300-1234567', { fontFamily:'Poppins', fontSize:W*.026, fill:'#fff', fontWeight:600, width:W*.85 }), .5, .72); },
+  bakery(){ solidBg('#fff7ed'); const W = currentSize.w;
+    const p = addPhoto(PH('wedding'), .06, .07, .42, .5, .04);
+    addAt(T('FRESH\nBAKERY', { fontFamily:'Playfair Display', fontSize:W*.085, fill:'#7c2d12', fontWeight:800, width:W*.44, lineHeight:1.12 }), .74, .1);
+    addAt(T('Baked fresh every morning — cakes, pastries & more', { fontFamily:'Inter', fontSize:W*.027, fill:'#9a3412', width:W*.42, lineHeight:1.45 }), .74, .3);
+    badge('100%\nFRESH', .74, .48, .2, '#ea580c', '#fff');
+    hline(.5, .68, .3, '#fdba74', 4);
+    addAt(T('Order your custom cake: 0300-1234567', { fontFamily:'Poppins', fontSize:W*.03, fill:'#7c2d12', fontWeight:600, width:W*.86 }), .5, .74);
+    addAt(T('Main Bazaar Road · Open 8 AM – 10 PM', { fontFamily:'Inter', fontSize:W*.025, fill:'#b45309', width:W*.8 }), .5, .82);
+    return p; },
+  birthday(){ gradRect('#8b3dff','#ec4899'); const W = currentSize.w;
+    deco(.08, .06, .05, '#fde047', .8); deco(.9, .1, .04, '#fff', .7); deco(.14, .8, .04, '#fff', .5); deco(.88, .82, .055, '#fde047', .65); deco(.5, .03, .03, '#fff', .6);
+    addAt(T('Happy Birthday', { fontFamily:'Pacifico', fontSize:W*.115, fill:'#fff', width:W*.94 }), .5, .22);
+    addAt(T('TO YOU!', { fontFamily:'Anton', fontSize:W*.1, fill:'#fde68a', width:W*.92 }), .5, .42);
+    hline(.5, .58, .16, '#fff', 3);
+    addAt(T('Wishing you a day full of happiness,\ncake and wonderful surprises.', { fontFamily:'Inter', fontSize:W*.031, fill:'#fce7f3', width:W*.84, lineHeight:1.4 }), .5, .64);
+    pill('WITH LOVE — FROM ALL OF US', .5, .8, .6, '#ffffff', '#a21caf', .028); },
+  yt(){ gradRect('#111827','#374151'); const W = currentSize.w;
+    deco(.94, .06, .12, '#ef4444', .25);
+    addAt(T('HOW TO', { fontFamily:'Anton', fontSize:W*.15, fill:'#fff', width:W*.92 }), .5, .08);
+    addAt(T('MAKE MONEY', { fontFamily:'Anton', fontSize:W*.15, fill:'#facc15', width:W*.92 }), .5, .28);
+    addAt(T('ONLINE', { fontFamily:'Anton', fontSize:W*.13, fill:'#fff', width:W*.92 }), .5, .48);
+    const play = new fabric.Circle({ radius:W*.055, fill:'#ef4444', name:'Play Button' }); addAt(play, .5, .74);
+    addAt(new fabric.Text('▶', { fontSize:W*.05, fill:'#fff', name:'Play Icon' }), .512, .765);
+    pill('FULL VIDEO — LINK IN DESCRIPTION', .5, .86, .56, '#facc15', '#111827', .026); },
+  eid(){ gradRect('#065f46','#0d9488'); const W = currentSize.w;
+    deco(.5, .06, .07, '#fde68a', .9); deco(.44, .045, .055, '#065f46', 1);
+    deco(.14, .1, .02, '#fde68a', .8); deco(.84, .16, .016, '#fff', .8); deco(.76, .05, .02, '#fde68a', .6);
+    addAt(T('Eid Mubarak', { fontFamily:'Playfair Display', fontSize:W*.125, fill:'#fff', fontWeight:700, width:W*.94 }), .5, .3);
+    hline(.5, .5, .18, '#fde68a', 3);
+    addAt(T('May your life be filled with\npeace, joy and blessings.', { fontFamily:'Inter', fontSize:W*.033, fill:'#d1fae5', width:W*.84, lineHeight:1.45 }), .5, .56);
+    addAt(T('— From our family to yours', { fontFamily:'Dancing Script', fontSize:W*.052, fill:'#fde68a', width:W*.86 }), .5, .76); },
+  fashion(){ const W = currentSize.w;
+    const p = addPhoto(PH('fashion'), 0, 0, 1, .62, 0);
+    shade(0, .62, 1, .38, '#faf6ef', 1);
+    addAt(T('NEW COLLECTION', { fontFamily:'Playfair Display', fontSize:W*.082, fill:'#3f2f1d', fontWeight:700, width:W*.94 }), .5, .66);
+    addAt(T('Fashion Sale 2026 — Up to 40% Off', { fontFamily:'Montserrat', fontSize:W*.029, fill:'#7c5c36', width:W*.86 }), .5, .79);
+    pill('SHOP THE LOOK', .5, .86, .44, '#3f2f1d', '#f5efe4', .028);
+    return p; },
+  wedding(){ solidBg('#fdf8ef'); const W = currentSize.w, H = currentSize.h;
+    const fr = new fabric.Rect({ left:W*.055, top:H*.055, width:W*.89, height:H*.89, fill:'transparent', stroke:'#c9a227', strokeWidth:3, name:'Gold Frame' }); canvas.add(fr);
+    const fr2 = new fabric.Rect({ left:W*.075, top:H*.075, width:W*.85, height:H*.85, fill:'transparent', stroke:'#c9a227', strokeWidth:1, name:'Gold Frame' }); canvas.add(fr2);
+    deco(.5, .13, .018, '#c9a227', .9);
+    addAt(T('THE WEDDING OF', { fontFamily:'Montserrat', fontSize:W*.026, fill:'#92710c', width:W*.7, charSpacing: 260 }), .5, .17);
+    addAt(T('Ayesha & Ahmed', { fontFamily:'Dancing Script', fontSize:W*.115, fill:'#7c5a10', width:W*.92 }), .5, .26);
+    hline(.5, .47, .14, '#c9a227', 2);
+    addAt(T('Saturday, 20 December 2026\nVenue: Royal Palm Hall · 7 PM onwards', { fontFamily:'Playfair Display', fontSize:W*.032, fill:'#57534e', width:W*.82, lineHeight:1.45 }), .5, .52);
+    addAt(T('Reception to follow · Your presence is our gift', { fontFamily:'Inter', fontSize:W*.025, fill:'#78716c', width:W*.8 }), .5, .7);
+    deco(.5, .8, .018, '#c9a227', .9); },
+  gym(){ gradRect('#18181b','#450a0a'); const W = currentSize.w;
+    deco(.5, .32, .36, '#dc2626', .12);
+    pill('FITNESS GYM', .5, .08, .4, '#dc2626', '#fff', .032);
+    addAt(T('NO PAIN', { fontFamily:'Anton', fontSize:W*.165, fill:'#fff', width:W*.94 }), .5, .2);
+    addAt(T('NO GAIN', { fontFamily:'Anton', fontSize:W*.165, fill:'#ef4444', width:W*.94 }), .5, .38);
+    addAt(T('Train hard. Stay strong. Become unstoppable.', { fontFamily:'Inter', fontSize:W*.03, fill:'#d4d4d8', width:W*.84 }), .5, .58);
+    badge('1st MONTH\nRs 1,500', .5, .66, .3, '#facc15', '#18181b');
+    addAt(T('Join today — 0300-1234567', { fontFamily:'Poppins', fontSize:W*.028, fill:'#e4e4e7', fontWeight:600, width:W*.8 }), .5, .88); },
+  travel(){ const W = currentSize.w;
+    const p = addPhoto(PH('laptop'), 0, 0, 1, 1, 0);
+    shade(0, .55, 1, .45, '#082f49', .82);
+    pill('TRAVEL PAKISTAN', .5, .07, .46, '#facc15', '#082f49', .03);
+    addAt(T('EXPLORE\nHUNZA VALLEY', { fontFamily:'Montserrat', fontSize:W*.105, fill:'#fff', fontWeight:900, width:W*.92, lineHeight:1.12 }), .5, .58);
+    addAt(T('3-day guided trip · Hotel · Transport · Food — from Rs 24,999', { fontFamily:'Inter', fontSize:W*.029, fill:'#e0f2fe', width:W*.88 }), .5, .8);
+    return p; },
+  music(){ const W = currentSize.w;
+    const p = addPhoto(PH('coffee'), 0, 0, 1, .58, 0);
+    shade(0, .58, 1, .42, '#1e1b4b', 1);
+    addAt(T('MUSIC NIGHT', { fontFamily:'Bebas Neue', fontSize:W*.115, fill:'#fff', width:W*.94 }), .5, .62);
+    addAt(T('LIVE IN CONCERT', { fontFamily:'Montserrat', fontSize:W*.036, fill:'#f9a8d4', fontWeight:700, width:W*.86, charSpacing: 200 }), .5, .74);
+    addAt(T('Saturday · 9 PM · City Arena — Tickets at the door', { fontFamily:'Inter', fontSize:W*.026, fill:'#e0e7ff', width:W*.86 }), .5, .82);
+    return p; },
+  baby(){ solidBg('#fdf2f8'); const W = currentSize.w;
+    deco(.1, .08, .07, '#f9a8d4', .55); deco(.88, .06, .05, '#93c5fd', .6); deco(.9, .8, .07, '#f9a8d4', .45); deco(.06, .84, .045, '#fde68a', .7);
+    pill("IT'S A CELEBRATION", .5, .09, .5, '#fce7f3', '#be185d', .028);
+    addAt(T('Baby Shower', { fontFamily:'Pacifico', fontSize:W*.115, fill:'#db2777', width:W*.94 }), .5, .24);
+    addAt(T('Welcome to the world, little one!', { fontFamily:'Poppins', fontSize:W*.036, fill:'#6d28d9', fontWeight:600, width:W*.86 }), .5, .46);
+    hline(.5, .58, .14, '#f9a8d4', 3);
+    addAt(T('Join us to celebrate — Sunday, 4 PM\nAt our home · Your blessings mean everything', { fontFamily:'Inter', fontSize:W*.03, fill:'#7e22ce', width:W*.84, lineHeight:1.45 }), .5, .63); },
+  vlog(){ gradRect('#f97316','#be185d'); const W = currentSize.w;
+    deco(.93, .08, .1, '#fff', .18); deco(.05, .8, .08, '#fde047', .4);
+    addAt(T('MY DAILY', { fontFamily:'Anton', fontSize:W*.155, fill:'#fff', width:W*.92 }), .5, .1);
+    addAt(T('VLOG', { fontFamily:'Anton', fontSize:W*.155, fill:'#fef08a', width:W*.92 }), .5, .3);
+    addAt(T('A day in my life — watch till the end!', { fontFamily:'Poppins', fontSize:W*.034, fill:'#fff', fontWeight:600, width:W*.86 }), .5, .55);
+    pill('NEW VIDEO EVERY FRIDAY', .5, .72, .54, '#0d1216', '#fff', .028); },
+  cricket(){ gradRect('#14532d','#166534'); const W = currentSize.w;
+    deco(.5, .3, .34, '#ffffff', .06);
+    pill('MATCH DAY', .5, .08, .38, '#facc15', '#14532d', .032);
+    addAt(T('PAKISTAN', { fontFamily:'Anton', fontSize:W*.15, fill:'#fff', width:W*.94 }), .5, .18);
+    addAt(T('VS INDIA', { fontFamily:'Anton', fontSize:W*.13, fill:'#facc15', width:W*.94 }), .5, .36);
+    addAt(T('T20 Thriller — Sunday, 7 PM', { fontFamily:'Poppins', fontSize:W*.036, fill:'#dcfce7', fontWeight:600, width:W*.86 }), .5, .55);
+    hline(.5, .66, .18, '#facc15', 4);
+    addAt(T('Watch live with friends · City Ground', { fontFamily:'Inter', fontSize:W*.028, fill:'#bbf7d0', width:W*.84 }), .5, .71);
+    pill('BLEED GREEN', .5, .8, .42, '#ffffff', '#14532d', .03); },
+  salon(){ solidBg('#fdf2f8'); const W = currentSize.w;
+    deco(.9, .04, .13, '#f9a8d4', .4); deco(.04, .82, .09, '#fbcfe8', .8);
+    addAt(T('BEAUTY', { fontFamily:'Playfair Display', fontSize:W*.13, fill:'#831843', fontWeight:800, width:W*.92 }), .5, .12);
+    addAt(T('SALON', { fontFamily:'Montserrat', fontSize:W*.07, fill:'#db2777', fontWeight:800, width:W*.9, charSpacing: 420 }), .5, .3);
+    hline(.5, .44, .14, '#db2777', 3);
+    addAt(T('Facial · Haircut · Bridal Makeup\nBy expert beauticians', { fontFamily:'Inter', fontSize:W*.031, fill:'#9d174d', width:W*.84, lineHeight:1.5 }), .5, .5);
+    badge('BRIDAL\n-30%', .5, .62, .28, '#db2777', '#fff');
+    addAt(T('Book now: 0300-1234567', { fontFamily:'Poppins', fontSize:W*.03, fill:'#831843', fontWeight:700, width:W*.84 }), .5, .84); },
+  car(){ solidBg('#111827'); const W = currentSize.w;
+    deco(.95, .02, .15, '#b45309', .3);
+    pill('FOR SALE', .24, .14, .34, '#f59e0b', '#111827', .032);
+    addAt(T('TOYOTA COROLLA', { fontFamily:'Montserrat', fontSize:W*.058, fill:'#fff', fontWeight:900, width:W*.92 }), .5, .28);
+    addAt(T('2020 Model · Automatic · Petrol', { fontFamily:'Inter', fontSize:W*.026, fill:'#fbbf24', width:W*.88 }), .5, .42);
+    hline(.5, .52, .55, '#374151', 2);
+    addAt(T('Total genuine condition · New tyres\nComplete file · Family used car', { fontFamily:'Inter', fontSize:W*.025, fill:'#d1d5db', width:W*.86, lineHeight:1.5 }), .5, .58);
+    addAt(T('Rs 38,50,000', { fontFamily:'Poppins', fontSize:W*.05, fill:'#f59e0b', fontWeight:800, width:W*.8 }), .28, .76);
+    addAt(T('0300-1234567', { fontFamily:'Poppins', fontSize:W*.032, fill:'#fff', fontWeight:700, width:W*.4 }), .76, .78); },
+  result(){ solidBg('#fefce8'); const W = currentSize.w;
+    starShape(.5, .14, .07, '#eab308');
+    addAt(T('RESULT DAY', { fontFamily:'Montserrat', fontSize:W*.085, fill:'#713f12', fontWeight:900, width:W*.94 }), .5, .24);
+    addAt(T('Congratulations to our topper!', { fontFamily:'Inter', fontSize:W*.032, fill:'#854d0e', width:W*.86 }), .5, .4);
+    badge('98%\nMARKS', .5, .48, .3, '#eab308', '#713f12');
+    addAt(T('Ayesha Khan — Class 10', { fontFamily:'Poppins', fontSize:W*.04, fill:'#713f12', fontWeight:700, width:W*.88 }), .5, .72);
+    addAt(T('ABC School · Annual Results 2026', { fontFamily:'Inter', fontSize:W*.027, fill:'#a16207', width:W*.84 }), .5, .8); },
+  podcast(){ solidBg('#18181b'); const W = currentSize.w, H = currentSize.h;
+    [0.3, 0.23, 0.16].forEach((r, i) => { const ring = new fabric.Circle({ radius: W*r, left: W*.5 - W*r, top: H*.3 - W*r, fill:'transparent', stroke: i === 1 ? '#a78bfa' : '#7c3aed', strokeWidth: 3, opacity: .8 - i*.22, selectable:false, name:'Ring' }); canvas.add(ring); });
+    deco(.5, .3, .085, '#7c3aed', 1);
+    addAt(T('THE WEEKLY', { fontFamily:'Montserrat', fontSize:W*.05, fill:'#a78bfa', fontWeight:800, width:W*.8, charSpacing: 300 }), .5, .52);
+    addAt(T('PODCAST', { fontFamily:'Anton', fontSize:W*.17, fill:'#fff', width:W*.94 }), .5, .58);
+    addAt(T('New episode every Monday — tech, business & life', { fontFamily:'Inter', fontSize:W*.029, fill:'#d4d4d8', width:W*.84 }), .5, .78);
+    pill('LISTEN NOW', .5, .86, .4, '#7c3aed', '#fff', .03); },
 };
+
+/* ---- Real rendered template thumbnails ---- */
+const THUMB_CACHE = {};
+let thumbBusy = false;
+function templateThumb(t){
+  if (t && THUMB_CACHE[t.id]) return 'url(' + THUMB_CACHE[t.id] + ') center/cover no-repeat';
+  const bg = (t && t.bg) || ['#8b3dff','#ec4899'];
+  return 'linear-gradient(135deg,' + bg[0] + ',' + bg[1] + ')';
+}
+function swapThumbs(){
+  document.querySelectorAll('[data-tpthumb]').forEach(el => {
+    const u = THUMB_CACHE[el.getAttribute('data-tpthumb')];
+    if (u) el.style.background = 'url(' + u + ') center/cover no-repeat';
+  });
+}
+async function renderOneThumb(t){
+  const size = SIZES.find(s => s.id === (t.size || 'ig-post')) || SIZES[0];
+  const tc = new fabric.StaticCanvas(null, { width: size.w, height: size.h });
+  canvas = tc; currentSize = size;
+  tc.setBackgroundColor('#ffffff', () => {});
+  const r = BUILDERS[t.id]();
+  if (r && r.then) await Promise.race([r, new Promise(res => setTimeout(res, 4000))]);
+  tc.renderAll();
+  THUMB_CACHE[t.id] = tc.toDataURL({ format:'jpeg', quality:.72, multiplier: Math.min(340 / size.w, 1) });
+  try { tc.dispose(); } catch(e){}
+}
+async function renderAllThumbs(){
+  if (thumbBusy || !window.fabric) return;
+  const ed = document.getElementById('view-editor');
+  if (ed && ed.style.display !== 'none') return;
+  if (TEMPLATES.every(t => THUMB_CACHE[t.id])){ swapThumbs(); return; }
+  thumbBusy = true;
+  const savedCanvas = canvas, savedSize = currentSize;
+  for (const t of TEMPLATES){
+    if (THUMB_CACHE[t.id]) continue;
+    const edNow = document.getElementById('view-editor');
+    if (edNow && edNow.style.display !== 'none') break;
+    try { await renderOneThumb(t); swapThumbs(); } catch(e){}
+  }
+  if (canvas && canvas.isStaticCanvas) canvas = savedCanvas;
+  currentSize = savedSize;
+  thumbBusy = false;
+}
 let activeCat = 'All';
 const CATS = ['All','Social Media','Marketing','Events','Education','Video'];
 function tplCardHTML(t, clickFn){
-  return `<div class="tpl-card" style="background:linear-gradient(135deg,${t.bg[0]},${t.bg[1]})" onclick="${clickFn}('${t.id}')">
+  return `<div class="tpl-card" style="background:${templateThumb(t)}" data-tpthumb="${t.id}" onclick="${clickFn}('${t.id}')">
     ${t.pro ? '<span class="lock-badge">⚡ PRO</span>' : ''}
     <div><div class="tpl-title">${t.title}</div><div class="tpl-sub">${t.sub}</div></div></div>`;
 }
@@ -1052,27 +1292,30 @@ function renderTemplateGrids(){
   if (home) home.innerHTML = filteredTpls().map(t => tplCardHTML(t, 'openTpl')).join('') || '<div class="empty-note">No templates match your search.</div>';
   const all = document.getElementById('tplGridAll');
   if (all) all.innerHTML = filteredTpls().map(t => tplCardHTML(t, 'openTpl')).join('') || '<div class="empty-note">No templates match.</div>';
+  renderAllThumbs();
 }
 function setCat(c){ activeCat = c; renderTemplateGrids(); }
 function renderTemplateLists(){
   const list = document.getElementById('tplList');
-  if (list) list.innerHTML = TEMPLATES.map(t => `<div class="tpl-mini" style="background:linear-gradient(135deg,${t.bg[0]},${t.bg[1]})" onclick="applyTemplate('${t.id}')">${t.pro ? '<span class="lock-badge">⚡ PRO</span>' : ''}<div class="tpl-title">${t.title}</div></div>`).join('');
+  if (list) list.innerHTML = TEMPLATES.map(t => `<div class="tpl-mini" style="background:${templateThumb(t)}" data-tpthumb="${t.id}" onclick="applyTemplate('${t.id}')">${t.pro ? '<span class="lock-badge">⚡ PRO</span>' : ''}<div class="tpl-title">${t.title}</div></div>`).join('');
   renderTemplateGrids();
 }
-function applyTemplate(id){
+async function applyTemplate(id){
   const tpl = TEMPLATES.find(t => t.id === id); if (!tpl) return;
   if (tpl.pro && !isPro()){ requirePro('This template'); return; }
   if (!canvas) openEditor(null, null);
+  if (tpl.size && SIZES.find(s => s.id === tpl.size)) setSize(tpl.size);
   saving = true; canvas.clear(); canvas.setBackgroundColor('#ffffff', () => {});
-  BUILDERS[id](); saving = false; history = []; hIndex = -1; pushHistory(true);
+  const r = BUILDERS[id]();
+  if (r && r.then) await Promise.race([r, new Promise(res => setTimeout(res, 2500))]);
+  saving = false; history = []; hIndex = -1; pushHistory(true);
   currentDesignId = null; document.getElementById('docTitle').value = tpl.title;
-  canvas.discardActiveObject(); canvas.renderAll(); renderLayers(); markUnsaved();
+  canvas.discardActiveObject(); canvas.renderAll(); renderLayers(); markUnsaved(); fitZoom();
   toast('✅ Template loaded — click anything to edit it');
 }
 function openTpl(id){
   const tpl = TEMPLATES.find(t => t.id === id);
   if (tpl && tpl.pro && !isPro()){ requirePro('This template'); return; }
-  startBlank(tpl && (tpl.id === 'yt' || tpl.id === 'vlog') ? 'yt-thumb' : (tpl && tpl.id === 'story' ? 'ig-story' : 'ig-post'));
   applyTemplate(id);
 }
 function startBlank(sizeId){
@@ -1380,13 +1623,9 @@ function focusAuth(signup){
   setTimeout(() => { const e = document.getElementById('auEmail'); if (e) e.focus({ preventScroll: true }); }, 550);
 }
 function showcaseTpl(id){ pendingTpl = id; focusAuth(true); toast('🎨 Pehle free account bana lo — ye template khud editor mein khul jayega'); }
-function templateThumb(t){
-  const bg = (t && t.bg) || ['#8b3dff','#ec4899'];
-  return 'linear-gradient(135deg,' + bg[0] + ',' + bg[1] + ')';
-}
 function renderShowcase(){
   const g = document.getElementById('showcaseGrid'); if (!g) return;
-  g.innerHTML = TEMPLATES.map(t => `<div class="tpl-card" style="background:${templateThumb(t)}" onclick="showcaseTpl('${t.id}')">${t.pro ? '<span class="lock-badge">⚡ PRO</span>' : ''}<div><div class="tpl-title">${t.title}</div><div class="tpl-sub">${t.cat}</div></div></div>`).join('');
+  g.innerHTML = TEMPLATES.map(t => `<div class="tpl-card" style="background:${templateThumb(t)}" data-tpthumb="${t.id}" onclick="showcaseTpl('${t.id}')">${t.pro ? '<span class="lock-badge">⚡ PRO</span>' : ''}<div><div class="tpl-title">${t.title}</div><div class="tpl-sub">${t.cat}</div></div></div>`).join('');
 }
 
 /* ================= UI helpers / init ================= */
