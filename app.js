@@ -354,6 +354,7 @@ function goPage(p){
   if (p === 'superadmin') renderSuperAdmin();
   if (p === 'account') renderAccount();
   window.scrollTo(0,0);
+  const mc = document.querySelector('.main-col'); if (mc) mc.scrollTop = 0;
 }
 function refreshPlanUI(){
   const pro = isPro();
