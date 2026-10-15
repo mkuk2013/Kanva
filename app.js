@@ -488,6 +488,8 @@ let uploads = JSON.parse(localStorage.getItem('kv_uploads') || '[]');
 
 function openEditor(sizeId, tplId){
   if (typeof fabric === 'undefined'){ toast('⚠️ Editor library load nahi hui — internet check karke page refresh karein'); return; }
+  thumbAbort = true;
+  try { renderTemplateLists(); } catch(e){}
   document.getElementById('view-app').style.display = 'none';
   document.getElementById('view-auth').style.display = 'none';
   document.getElementById('view-editor').style.display = '';
@@ -909,10 +911,11 @@ function solidBg(c){ canvas.setBackgroundColor(c, () => canvas.renderAll()); }
 function addAt(o, xPct, yPct){ o.set({ left: currentSize.w*xPct - (o.width*(o.scaleX||1))/2, top: currentSize.h*yPct }); canvas.add(o); return o; }
 const PH = seed => 'https://picsum.photos/seed/kanva-' + seed + '/1000/1000';
 function addPhoto(url, xP, yP, wP, hP, r){
+  const cv = canvas;
   const W = currentSize.w, H = currentSize.h;
   const x = W*xP, y = H*yP, w = W*wP, h = H*hP, rad = (r || 0) * W;
   const ph = new fabric.Rect({ left:x, top:y, width:w, height:h, fill:'#c9ced6', rx:rad, ry:rad, name:'Photo' });
-  canvas.add(ph);
+  cv.add(ph);
   return new Promise(res => {
     try {
       fabric.Image.fromURL(url, img => {
@@ -920,7 +923,7 @@ function addPhoto(url, xP, yP, wP, hP, r){
         const s = Math.max(w / img.width, h / img.height);
         img.set({ left:x, top:y, scaleX:s, scaleY:s, name:'Photo',
           clipPath: new fabric.Rect({ left:x, top:y, width:w, height:h, rx:rad, ry:rad, absolutePositioned:true }) });
-        canvas.add(img); canvas.remove(ph); canvas.renderAll(); res();
+        cv.add(img); cv.remove(ph); cv.renderAll(); res();
       }, { crossOrigin:'anonymous' });
     } catch(e){ res(); }
   });
@@ -1235,6 +1238,7 @@ const BUILDERS = {
 /* ---- Real rendered template thumbnails ---- */
 const THUMB_CACHE = {};
 let thumbBusy = false;
+let thumbAbort = false;
 function templateThumb(t){
   if (t && THUMB_CACHE[t.id]) return 'url(' + THUMB_CACHE[t.id] + ') center/cover no-repeat';
   const bg = (t && t.bg) || ['#8b3dff','#ec4899'];
@@ -1253,6 +1257,7 @@ async function renderOneThumb(t){
   tc.setBackgroundColor('#ffffff', () => {});
   const r = BUILDERS[t.id]();
   if (r && r.then) await Promise.race([r, new Promise(res => setTimeout(res, 4000))]);
+  if (canvas !== tc){ try { tc.dispose(); } catch(e){} return; }
   tc.renderAll();
   THUMB_CACHE[t.id] = tc.toDataURL({ format:'jpeg', quality:.72, multiplier: Math.min(340 / size.w, 1) });
   try { tc.dispose(); } catch(e){}
@@ -1262,10 +1267,11 @@ async function renderAllThumbs(){
   const ed = document.getElementById('view-editor');
   if (ed && ed.style.display !== 'none') return;
   if (TEMPLATES.every(t => THUMB_CACHE[t.id])){ swapThumbs(); return; }
-  thumbBusy = true;
+  thumbBusy = true; thumbAbort = false;
   const savedCanvas = canvas, savedSize = currentSize;
   for (const t of TEMPLATES){
     if (THUMB_CACHE[t.id]) continue;
+    if (thumbAbort) break;
     const edNow = document.getElementById('view-editor');
     if (edNow && edNow.style.display !== 'none') break;
     try { await renderOneThumb(t); swapThumbs(); } catch(e){}
