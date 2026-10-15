@@ -402,3 +402,10 @@ button{cursor:pointer;font-family:inherit}
 #stage{flex:1;overflow:auto;min-width:0}
 .panel-close{display:none;position:absolute;top:10px;right:10px;width:30px;height:30px;border-radius:50%;border:1px solid var(--line);background:#fff;font-size:14px;color:#444;z-index:5;cursor:pointer}
 @media (max-width:900px){ .panel-close{display:block} .sidepanel{padding-top:44px} }
+
+
+/* ---- app shell: left sidebar hamesha fixed, sirf right content scroll ---- */
+#view-app{display:flex;height:100vh;height:100dvh;overflow:hidden}
+.sidebar{height:100%;align-self:flex-start}
+.main-col{flex:1;min-width:0;overflow-y:auto}
+@media (max-width:900px){ .logout-btn .sn-txt{display:none} .logout-btn{padding:9px} }
