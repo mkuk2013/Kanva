@@ -9,7 +9,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="kanva-logo.png">
 <link rel="apple-touch-icon" href="Kanva icon 192.png">
-<link rel="stylesheet" href="style.css?v=10">
+<link rel="stylesheet" href="style.css?v=11">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700&family=Bebas+Neue&family=Pacifico&family=Montserrat:wght@500;700;900&family=Roboto:wght@400;700&family=Oswald:wght@500;700&family=Dancing+Script:wght@700&family=Anton&family=Lobster&display=swap" rel="stylesheet">
 </head>
@@ -98,7 +98,7 @@
     <p class="lp-sub">Start free. Upgrade when you are ready — pay easily with Easypaisa.</p>
     <div class="lp-pricing">
       <div class="lp-price-card"><h3>Free</h3><div class="price">Rs 0</div><ul><li>✅ Full drag &amp; drop editor</li><li>✅ Free templates</li><li>✅ PNG / JPG / PDF export</li><li>✅ 5 saved projects</li></ul></div>
-      <div class="lp-price-card pro"><h3>⚡ Kanva Pro</h3><div class="price">Rs 599<span>/month</span></div><p class="yearly">or Rs 4,999/year — 2 months free</p><ul><li>✅ All 20 templates unlocked</li><li>✅ HD export, no watermark</li><li>✅ Unlimited saved projects</li><li>✅ Brand Kit (colors, logo, fonts)</li><li>✅ Team — add up to 5 members</li></ul></div>
+      <div class="lp-price-card pro"><h3>⚡ Kanva Pro</h3><div class="price">Rs 599<span>/month</span></div><p class="yearly">or Rs 4,999/year — 2 months free</p><ul><li>✅ All 30 templates unlocked</li><li>✅ HD export, no watermark</li><li>✅ Unlimited saved projects</li><li>✅ Brand Kit (colors, logo, fonts)</li><li>✅ Team — add up to 500 members</li></ul></div>
     </div>
     <button class="btn btn-primary big" onclick="focusAuth(true)">Create your free account</button>
   </section>
@@ -188,8 +188,8 @@
 
     <!-- PAGE: PRICING -->
     <section class="page" id="page-team" style="display:none">
-      <div class="sec-head"><h2>👥 Your Team</h2><span id="teamCount" class="pro-chip big-chip">0 / 5 members</span></div>
-      <p class="muted">Pro ke sath apni team banao — <b>5 members tak</b> add karo. Har member ko usi email se Kanva par login karne par <b>Pro features</b> mil jayenge (is device/browser par).</p>
+      <div class="sec-head"><h2>👥 Your Team</h2><span id="teamCount" class="pro-chip big-chip">0 / 500 members</span></div>
+      <p class="muted">Pro ke sath apni team banao — <b>500 members tak</b> add karo. Har member ko usi email se Kanva par login karne par — kisi bhi device par — <b>Pro features</b> mil jayenge.</p>
       <div id="teamMemberBanner" class="team-banner" style="display:none"></div>
       <div id="teamLocked" class="locked-box">🔒 Team is a Pro feature.<br><span class="muted small">Pro lo, team banao, aur 5 logon ke sath Pro share karo.</span><br><button class="btn btn-upgrade" onclick="openPayment('monthly')">Upgrade to Pro</button></div>
       <div id="teamMain" style="display:none">
@@ -216,7 +216,7 @@
         <div class="price-card pro">
           <div class="pro-tag">MOST POPULAR</div>
           <h3>Pro ⚡</h3><div class="price">Rs 599 <span>/ month</span></div><div class="yearly">or Rs 4,999 / year — save 30%</div>
-          <ul><li>✅ Everything in Free</li><li>✅ ALL templates unlocked</li><li>✅ Premium fonts & elements</li><li>✅ HD export — no watermark</li><li>✅ Unlimited projects</li><li>✅ Brand Kit</li><li>✅ Team — add up to 5 members</li></ul>
+          <ul><li>✅ Everything in Free</li><li>✅ ALL templates unlocked</li><li>✅ Premium fonts & elements</li><li>✅ HD export — no watermark</li><li>✅ Unlimited projects</li><li>✅ Brand Kit</li><li>✅ Team — add up to 500 members</li></ul>
           <button class="btn btn-primary btn-block" id="pricingUpgradeBtn" onclick="openPayment('monthly')">Upgrade with Easypaisa</button>
           <div class="pro-active-note" id="pricingProNote" style="display:none">✅ You are on Kanva Pro — all features are unlocked. Enjoy!</div>
         </div>
@@ -446,7 +446,7 @@
 <script src="icons1.js?v=2"></script>
 <script src="icons2.js?v=2"></script>
 <script src="icons3.js?v=2"></script>
-<script src="app.js?v=21"></script>
+<script src="app.js?v=22"></script>
 <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(()=>{}); }</script>
 </body>
 </html>
