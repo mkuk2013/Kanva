@@ -21,7 +21,7 @@ const SIZES = [
   { id:'poster',   name:'Poster',            w:794,  h:1123, icon:'poster' },
   { id:'fb-cover', name:'Facebook Cover',    w:1640, h:924,  icon:'cover' },
 ];
-const FONTS = ['Poppins','Inter','Montserrat','Roboto','Oswald','Bebas Neue','Playfair Display','Pacifico','Dancing Script','Anton','Lobster','Arial','Georgia','Verdana','Courier New'];
+const FONTS = ['Poppins','Inter','Noto Nastaliq Urdu','Montserrat','Roboto','Oswald','Bebas Neue','Playfair Display','Pacifico','Dancing Script','Anton','Lobster','Arial','Georgia','Verdana','Courier New'];
 
 /* ---------------- AUTH (Supabase cloud — v3) ----------------
    Accounts/designs/plans/teams/orders live in Supabase Postgres.
@@ -898,10 +898,24 @@ function renderUploads(){
   if (bp) bp.innerHTML = (isPro() && b.logo) ? `<h4>Brand logo</h4><div class="upload-grid"><img src="${b.logo}" onclick="addImageURL(getBrand().logo)"></div>` : '';
 }
 const PHOTO_SEEDS = ['nature','city','food','travel','tech','people','animal','fashion','work','art','sport','music'];
+const PHOTO_CATS = {
+  'All': ['nature','city','food','travel','tech','people','animal','fashion'],
+  'Nature': ['mountain','river','forest','ocean','sunset','desert','garden','snow'],
+  'City': ['street','building','bridge','market','night','tower','cafe','road'],
+  'Food': ['burger','pizza','cake','coffee','fruit','spice','bbq','dessert'],
+  'People': ['smile','team','student','family','artist','worker','sport','dance'],
+  'Business': ['office','meeting','laptop','growth','idea','store','delivery','craft'],
+  'Pakistan': ['hunza','lahore','karachi','mosque','truck','bazaar','cricket','mehndi']
+};
+let photoCat = 'All';
+function setPhotoCat(c){ photoCat = c; renderPhotos(); }
 function renderPhotos(){
   const g = document.getElementById('photoGrid'); if (!g) return;
-  g.innerHTML = PHOTO_SEEDS.map(s => `<img loading="lazy" src="https://picsum.photos/seed/kanva-${s}/300/220" alt="${s}">`).join('');
-  [...g.querySelectorAll('img')].forEach((img, i) => { img.onclick = () => addImageURL('https://picsum.photos/seed/kanva-' + PHOTO_SEEDS[i] + '/900/700'); });
+  const cats = document.getElementById('photoCats');
+  if (cats) cats.innerHTML = Object.keys(PHOTO_CATS).map(c => `<button class="cat-chip ${c === photoCat ? 'active' : ''}" onclick="setPhotoCat('${c}')">${c}</button>`).join('');
+  const seeds = PHOTO_CATS[photoCat] || PHOTO_CATS['All'];
+  g.innerHTML = seeds.map(s => `<img loading="lazy" src="https://picsum.photos/seed/kanva-${s}/300/220" alt="${s}">`).join('');
+  [...g.querySelectorAll('img')].forEach((img, i) => { img.onclick = () => addImageURL('https://picsum.photos/seed/kanva-' + seeds[i] + '/900/700'); });
 }
 
 /* ================= TEMPLATES (30) — original Kanva designs ================= */
@@ -1272,6 +1286,7 @@ async function renderOneThumb(t){
 }
 async function renderAllThumbs(){
   if (thumbBusy || thumbHold || !window.fabric) return;
+  try { await Promise.race([document.fonts.load('700 40px "Noto Nastaliq Urdu"'), new Promise(r => setTimeout(r, 1800))]); } catch(e){}
   const ed = document.getElementById('view-editor');
   if (ed && ed.style.display !== 'none') return;
   if (TEMPLATES.every(t => THUMB_CACHE[t.id])){ swapThumbs(); return; }
@@ -1310,7 +1325,7 @@ function renderTemplateGrids(){
 function setCat(c){ activeCat = c; renderTemplateGrids(); }
 function renderTemplateLists(){
   const list = document.getElementById('tplList');
-  if (list) list.innerHTML = TEMPLATES.map(t => `<div class="tpl-mini" style="background:${templateThumb(t)}" data-tpthumb="${t.id}" onclick="applyTemplate('${t.id}')">${t.pro ? '<span class="lock-badge">⚡ PRO</span>' : ''}<div class="tpl-title">${t.title}</div></div>`).join('');
+  if (list) list.innerHTML = TEMPLATES.map(t => `<div class="tpl-mini-wrap" onclick="applyTemplate('${t.id}')"><div class="tpl-mini" style="background:${templateThumb(t)}" data-tpthumb="${t.id}">${t.pro ? '<span class="lock-badge">⚡ PRO</span>' : ''}</div><div class="tpl-mini-cap">${t.title}</div></div>`).join('');
   renderTemplateGrids();
 }
 async function applyTemplate(id){
@@ -1325,6 +1340,7 @@ async function applyTemplate(id){
   const r = BUILDERS[id]();
   if (r && r.then) await Promise.race([r, new Promise(res => setTimeout(res, 2500))]);
   if (canvas !== ec) canvas = ec;
+  if (document.fonts && document.fonts.load){ document.fonts.load('700 40px "Noto Nastaliq Urdu"').then(() => { if (canvas && canvas.renderAll) canvas.renderAll(); }).catch(() => {}); }
   saving = false; history = []; hIndex = -1; pushHistory(true);
   currentDesignId = null; document.getElementById('docTitle').value = tpl.title;
   canvas.discardActiveObject(); canvas.renderAll(); renderLayers(); markUnsaved(); fitZoom();
@@ -1710,3 +1726,49 @@ async function saveProfileName(){
 
 
 function closePanel(){ const p = document.querySelector('.sidepanel'); if (p) p.classList.remove('open'); }
+
+
+/* ---- Wave 2: Urdu templates (Nastaliq) ---- */
+function crescent(cxP, cyP, rP, col, bgCol){
+  const W = currentSize.w, H = currentSize.h;
+  canvas.add(new fabric.Circle({ left: W*cxP - W*rP, top: H*cyP - W*rP, radius: W*rP, fill: col, name:'Deco' }));
+  canvas.add(new fabric.Circle({ left: W*cxP - W*rP + W*rP*.38, top: H*cyP - W*rP - W*rP*.14, radius: W*rP*.86, fill: bgCol, name:'Deco' }));
+}
+TEMPLATES.push(
+  { id:'eidurdu', title:'Eid Mubarak (Urdu)', sub:'Urdu greeting card', cat:'Events', size:'ig-post', bg:['#065f46','#064e3b'], pro:false },
+  { id:'jummah', title:'Jummah Mubarak (Urdu)', sub:'Urdu blessing card', cat:'Events', size:'ig-post', bg:['#0f2540','#123c69'], pro:false },
+  { id:'ramadanurdu', title:'Ramadan Kareem (Urdu)', sub:'Urdu story card', cat:'Events', size:'ig-story', bg:['#1e1b4b','#312e81'], pro:false }
+);
+Object.assign(BUILDERS, {
+  eidurdu(){ const W = currentSize.w, H = currentSize.h;
+    gradRect('#065f46', '#064e3b');
+    deco([[.08,.07,.05],[.92,.07,.05],[.5,.16,.035]], 'rgba(245,197,66,.16)');
+    crescent(.5, .235, .052, '#f5c542', '#065f46');
+    starShape(.5, .335, .02, '#f5c542');
+    addAt(T('عید مبارک', { fontFamily:'Noto Nastaliq Urdu', fontSize:W*.115, fill:'#f5c542', fontWeight:700, width:W*.86, lineHeight:1.9 }), .5, .40);
+    addAt(T('آپ کو اور آپ کے اہلِ خانہ کو دل کی گہرائیوں سے', { fontFamily:'Noto Nastaliq Urdu', fontSize:W*.042, fill:'#e7f6ee', width:W*.8, lineHeight:2 }), .5, .615);
+    addAt(T('عید کی خوشیاں مبارک ہوں', { fontFamily:'Noto Nastaliq Urdu', fontSize:W*.042, fill:'#e7f6ee', width:W*.8, lineHeight:2 }), .5, .685);
+    hline(.5, .815, .3, '#f5c542');
+    addAt(T('EID MUBARAK', { fontFamily:'Montserrat', fontSize:W*.026, fill:'#f5c542', fontWeight:700, charSpacing:320, width:W*.7 }), .5, .845);
+  },
+  jummah(){ const W = currentSize.w, H = currentSize.h;
+    gradRect('#0f2540', '#123c69');
+    canvas.add(new fabric.Circle({ left: W*.5 - W*.30, top: H*.075, radius: W*.30, fill:'transparent', stroke:'rgba(245,197,66,.4)', strokeWidth: 3, name:'Deco' }));
+    crescent(.5, .225, .048, '#f5c542', '#0f2540');
+    addAt(T('جمعہ مبارک', { fontFamily:'Noto Nastaliq Urdu', fontSize:W*.12, fill:'#f5c542', fontWeight:700, width:W*.86, lineHeight:1.9 }), .5, .385);
+    addAt(T('اللہ آپ کی تمام دعائیں قبول فرمائے', { fontFamily:'Noto Nastaliq Urdu', fontSize:W*.044, fill:'#eaf2fb', width:W*.82, lineHeight:2 }), .5, .60);
+    addAt(T('اور آپ کے گھر میں رحمت و برکت نازل فرمائے', { fontFamily:'Noto Nastaliq Urdu', fontSize:W*.044, fill:'#eaf2fb', width:W*.82, lineHeight:2 }), .5, .672);
+    hline(.5, .80, .3, '#f5c542');
+    addAt(T('JUMMAH MUBARAK', { fontFamily:'Montserrat', fontSize:W*.026, fill:'#f5c542', fontWeight:700, charSpacing:300, width:W*.7 }), .5, .83);
+  },
+  ramadanurdu(){ const W = currentSize.w, H = currentSize.h;
+    gradRect('#1e1b4b', '#312e81');
+    deco([[.12,.06,.04],[.86,.09,.05],[.7,.2,.03],[.18,.24,.03],[.9,.3,.035]], 'rgba(245,197,66,.20)');
+    crescent(.5, .15, .045, '#f5c542', '#1e1b4b');
+    addAt(T('رمضان كريم', { fontFamily:'Noto Nastaliq Urdu', fontSize:W*.125, fill:'#f5c542', fontWeight:700, width:W*.88, lineHeight:1.9 }), .5, .235);
+    addAt(T('برکتوں اور رحمتوں والا مہینہ مبارک ہو', { fontFamily:'Noto Nastaliq Urdu', fontSize:W*.045, fill:'#eef0ff', width:W*.84, lineHeight:2 }), .5, .375);
+    pill('RAMADAN KAREEM', .5, .47, .56, '#f5c542', '#1e1b4b', .028);
+    addAt(T('اللہ ہم سب کی عبادتیں قبول فرمائے', { fontFamily:'Noto Nastaliq Urdu', fontSize:W*.042, fill:'#dfe3ff', width:W*.84, lineHeight:2 }), .5, .56);
+    addAt(T('— KANVA GREETINGS —', { fontFamily:'Montserrat', fontSize:W*.024, fill:'rgba(255,255,255,.65)', charSpacing:240, width:W*.7 }), .5, .90);
+  }
+});
