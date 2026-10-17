@@ -9,7 +9,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="kanva-logo.png">
 <link rel="apple-touch-icon" href="Kanva icon 192.png">
-<link rel="stylesheet" href="style.css?v=18">
+<link rel="stylesheet" href="style.css?v=19">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700&family=Bebas+Neue&family=Pacifico&family=Montserrat:wght@500;700;900&family=Roboto:wght@400;700&family=Oswald:wght@500;700&family=Dancing+Script:wght@700&family=Anton&family=Lobster&family=Noto+Nastaliq+Urdu:wght@400;700&display=swap" rel="stylesheet">
 </head>
@@ -298,6 +298,8 @@
       <button class="btn btn-download" onclick="toggleExportMenu()"><img class="cm-ic" data-ic="download" alt="">Download</button>
       <div id="exportMenu" class="export-menu" style="display:none">
         <button onclick="exportPNG(1)"><img class="cm-ic" data-ic="photos" alt="">PNG — Standard (Free)</button>
+        <button onclick="exportTransparent()"><img class="cm-ic" data-ic="photos" alt="">PNG — Transparent (Free)</button>
+        <button onclick="exportPNG(2)"><img class="cm-ic" data-ic="photos" alt="">PNG — 2x ⚡ Pro</button>
         <button onclick="exportPNG(3)"><img class="cm-ic" data-ic="photos" alt="">PNG — HD ⚡ Pro</button>
         <button onclick="exportJPG()"><img class="cm-ic" data-ic="photos" alt="">JPG</button>
         <button onclick="exportPDF()"><img class="cm-ic" data-ic="poster" alt="">PDF</button>
@@ -310,6 +312,7 @@
     <span class="ctx-hint" id="ctxHint">Select an element to edit — or add something from the left panel.</span>
     <div id="ctxControls" style="display:none">
       <input type="color" id="pFill" title="Color" oninput="setFill(this.value)">
+      <span id="gradCtx"><input type="color" id="gradA" value="#8b3dff" title="Gradient start"><input type="color" id="gradB" value="#ec4899" title="Gradient end"><button class="ctx-btn" onclick="setGradientFill()" title="Gradient fill lagao">Gradient</button><button class="ctx-btn" onclick="clearGradient()" title="Solid color wapas">Solid</button></span>
       <span id="textCtx">
         <select id="pFont" onchange="setFont(this.value)"></select>
         <input type="number" id="pFontSize" min="8" max="320" onchange="setFontSize(this.value)">
@@ -320,6 +323,9 @@
         <button class="ctx-btn" onclick="setAlign('center')">⬌</button>
         <button class="ctx-btn" onclick="setAlign('right')">➡</button>
         <select id="pShadow" onchange="setShadow(this.value)"><option value="none">No effect</option><option value="soft">Shadow</option><option value="hard">Hard shadow</option><option value="glow">Glow</option></select>
+        <label class="ctx-lbl">Curve <input type="range" id="pCurve" min="-150" max="150" step="5" value="60" oninput="recurve(this.value)"></label>
+        <button class="ctx-btn" onclick="curveText()" title="Text ko curve karein">⤴ Curve</button>
+        <button class="ctx-btn" onclick="uncurveText()" title="Curve hatao">Uncurve</button>
         <label class="ctx-lbl">Spacing <input type="range" id="pCharSp" min="0" max="400" step="10" value="0" oninput="setCharSpacing(this.value)"></label>
         <label class="ctx-lbl">Highlight <input type="color" id="pTextBg" value="#ffff00" oninput="setTextBg(this.value)"></label>
         <button class="ctx-btn" onclick="clearTextBg()" title="Remove highlight">✕</button>
@@ -377,6 +383,8 @@
         <h4>Shapes</h4><div class="el-grid" id="shapeGrid"></div>
         <h4>Lines & arrows</h4><div class="el-grid" id="lineGrid"></div>
         <h4>Frames & charts</h4><div class="el-grid" id="frameGrid"></div>
+        <h4>QR Code</h4>
+        <div class="qr-row"><input id="qrText" class="acc-input" placeholder="Link ya text — jaise https://aapki-shop.com"><button class="btn btn-primary btn-block" onclick="addQRCode()">➕ Add QR code</button></div>
         <h4>Stickers</h4><div class="el-grid stickers" id="stickerGrid"></div>
       </div>
       <div class="tabpage" id="tab-text" style="display:none">
@@ -465,10 +473,11 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="icons1.js?v=3"></script>
 <script src="icons2.js?v=3"></script>
 <script src="icons3.js?v=3"></script>
-<script src="app.js?v=29"></script>
+<script src="app.js?v=31"></script>
 <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(()=>{}); }</script>
 </body>
 </html>
