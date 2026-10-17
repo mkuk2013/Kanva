@@ -538,7 +538,27 @@ function initCanvas(){
   ['object:added','object:removed','object:modified'].forEach(ev => canvas.on(ev, () => { if (!saving){ pushHistory(); markUnsaved(); } renderLayers(); }));
   buildSidebars(); renderUploads(); renderPhotos(); pushHistory(true);
 }
-function markUnsaved(){ document.getElementById('savedNote').textContent = '● Unsaved changes'; }
+function markUnsaved(){ document.getElementById('savedNote').textContent = '● Unsaved changes'; scheduleAutosave(); }
+let autosaveTimer = null;
+function scheduleAutosave(){
+  if (!currentDesignId) return;
+  clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(autosaveNow, 2600);
+}
+function autosaveNow(){
+  if (!canvas || !currentDesignId || saving) return;
+  const act = canvas.getActiveObject();
+  if (act && act.isEditing){ scheduleAutosave(); return; }
+  const note = document.getElementById('savedNote'); if (note) note.textContent = '… Saving';
+  try {
+    const snap = designSnapshot();
+    const ds = getDesigns();
+    const d = ds.find(x => x.id === currentDesignId);
+    if (d){ Object.assign(d, snap, { name: document.getElementById('docTitle').value.trim() || d.name, sizeId: currentSize.id, sizeName: currentSize.name, sizeW: currentSize.w, sizeH: currentSize.h, updated: new Date().toLocaleString() }); saveDesigns(ds); }
+    if (act && canvas.getObjects().includes(act)){ canvas.setActiveObject(act); canvas.renderAll(); }
+    if (note) note.textContent = '✓ Saved';
+  } catch(e){ if (note) note.textContent = '● Unsaved changes'; }
+}
 function docTitleChanged(){ markUnsaved(); }
 function fitZoom(){
   const stage = document.getElementById('stage'); if (!stage || !canvas) return;
@@ -552,7 +572,7 @@ function zoomOut(){ zoom = Math.max(.07, zoom / 1.15); applyZoom(); }
 /* history */
 function pushHistory(init){
   if (saving) return;
-  const json = JSON.stringify(canvas.toJSON(['selectable','evented','name','__locked','__f']));
+  const json = JSON.stringify(canvas.toJSON(['selectable','evented','name','__locked','__f','__curve','__grad']));
   if (!init && history[hIndex] === json) return;
   history = history.slice(0, hIndex + 1); history.push(json);
   if (history.length > 60) history.shift();
@@ -646,9 +666,12 @@ function syncProps(){
   const o = active(); if (!o) return;
   document.getElementById('ctxHint').style.display = 'none';
   const cc = document.getElementById('ctxControls'); cc.style.display = 'flex';
-  const isText = ['textbox','i-text','text'].includes(o.type);
+  const isText = ['textbox','i-text','text'].includes(o.type) || !!o.__curve;
   document.getElementById('textCtx').style.display = isText ? '' : 'none';
   if (typeof o.fill === 'string') document.getElementById('pFill').value = o.fill;
+  const ga = document.getElementById('gradA'), gb = document.getElementById('gradB');
+  if (ga && gb){ if (o.__grad){ ga.value = o.__grad.a; gb.value = o.__grad.b; } else if (typeof o.fill === 'string'){ ga.value = o.fill; } }
+  const pcv = document.getElementById('pCurve'); if (pcv && o.__curve) pcv.value = o.__curve.angle;
   document.getElementById('pOpacity').value = Math.round((o.opacity ?? 1) * 100);
   if (isText){
     document.getElementById('pFont').value = o.fontFamily || 'Poppins';
@@ -665,7 +688,17 @@ function syncProps(){
   syncImgCtx();
   renderLayers();
 }
-function setFill(v){ const o=active(); if(o){ o.set('fill', v); canvas.renderAll(); } }
+function setFill(v){ const o=active(); if(o){ o.__grad = null; o.set('fill', v); canvas.renderAll(); } }
+function setGradientFill(){
+  const o = active(); if (!o) return;
+  const a = document.getElementById('gradA').value, b = document.getElementById('gradB').value;
+  const w = Math.max((o.width || 100) * (o.scaleX || 1), 1), h = Math.max((o.height || 100) * (o.scaleY || 1), 1);
+  o.set('fill', new fabric.Gradient({ type: 'linear', gradientUnits: 'pixels', coords: { x1: 0, y1: 0, x2: w, y2: h }, colorStops: [{ offset: 0, color: a }, { offset: 1, color: b }] }));
+  o.__grad = { a, b };
+  canvas.renderAll(); pushHistory(); markUnsaved();
+  toast('🌈 Gradient lag gaya');
+}
+function clearGradient(){ const o = active(); if (!o) return; o.__grad = null; o.set('fill', document.getElementById('gradA').value); canvas.renderAll(); pushHistory(); markUnsaved(); }
 function setOpacity(v){ const o=active(); if(o){ o.set('opacity', v/100); canvas.renderAll(); } }
 function setFont(v){ const o=active(); if(o){ o.set('fontFamily', v); canvas.renderAll(); } }
 function setFontSize(v){ const o=active(); if(o){ o.set('fontSize', parseInt(v)||40); canvas.renderAll(); } }
@@ -720,6 +753,49 @@ function toggleLock(){
   toast(locked ? '🔒 Locked — ye galti se move nahi hoga' : '🔓 Unlocked');
 }
 /* ---- Text extras ---- */
+function buildCurveGroup(txt, font, size, fill, weight, style, angleDeg, cx, cy){
+  const chars = [...txt];
+  const meas = chars.map(ch => ({ ch, w: new fabric.Text(ch, { fontFamily: font, fontSize: size, fontWeight: weight, fontStyle: style }).width }));
+  const total = meas.reduce((sum, m) => sum + m.w, 0) || 1;
+  const ang = Math.max(12, Math.abs(angleDeg)) * Math.PI / 180;
+  const R = Math.max(total / ang, size * 1.15);
+  const arch = angleDeg >= 0;
+  const items = []; let acc = -total / 2;
+  meas.forEach(m => {
+    const mid = acc + m.w / 2; acc += m.w;
+    const th = mid / R;
+    const x = R * Math.sin(th), y = arch ? -R * Math.cos(th) : R * Math.cos(th);
+    items.push(new fabric.Text(m.ch, { fontFamily: font, fontSize: size, fontWeight: weight, fontStyle: style, fill, left: x, top: y, originX: 'center', originY: 'center', angle: th * 180 / Math.PI }));
+  });
+  const g = new fabric.Group(items, { name: 'Curved Text' });
+  g.__curve = { text: txt, fontFamily: font, fontSize: size, fill: (typeof fill === 'string' ? fill : '#111111'), fontWeight: weight, fontStyle: style, angle: angleDeg };
+  g.set({ left: cx, top: cy, originX: 'center', originY: 'center' }); g.setCoords();
+  return g;
+}
+function curveText(){
+  const o = active(); if (!o) return;
+  if (o.__curve){ toast('Ye pehle se curved hai — slider se angle badlein ya Uncurve karein'); return; }
+  if (!['textbox','i-text','text'].includes(o.type)){ toast('Curve sirf text par lagta hai — pehle text select karein'); return; }
+  const ang = parseInt((document.getElementById('pCurve') || {}).value) || 60;
+  const c = o.getCenterPoint();
+  const g = buildCurveGroup(o.text || 'Text', o.fontFamily || 'Poppins', o.fontSize || 60, o.fill, o.fontWeight || 'normal', o.fontStyle || 'normal', ang, c.x, c.y);
+  canvas.remove(o); canvas.add(g); canvas.setActiveObject(g); canvas.renderAll(); pushHistory(); markUnsaved(); syncProps();
+  toast('⤴️ Text curve ho gaya — slider se angle adjust karein');
+}
+function recurve(v){
+  const o = active(); if (!o || !o.__curve) return;
+  const ang = parseInt(v) || 0; if (!ang) return;
+  const c = o.getCenterPoint(); const cv = o.__curve;
+  const g = buildCurveGroup(cv.text, cv.fontFamily, cv.fontSize, cv.fill, cv.fontWeight, cv.fontStyle, ang, c.x, c.y);
+  canvas.remove(o); canvas.add(g); canvas.setActiveObject(g); canvas.renderAll(); pushHistory(); markUnsaved();
+}
+function uncurveText(){
+  const o = active(); if (!o || !o.__curve) return;
+  const cv = o.__curve; const c = o.getCenterPoint();
+  const t = new fabric.Textbox(cv.text, { fontFamily: cv.fontFamily, fontSize: cv.fontSize, fill: cv.fill, fontWeight: cv.fontWeight, fontStyle: cv.fontStyle, width: currentSize.w * .85, textAlign: 'center', name: 'Text', left: c.x, top: c.y, originX: 'center', originY: 'center' });
+  canvas.remove(o); canvas.add(t); canvas.setActiveObject(t); canvas.renderAll(); pushHistory(); markUnsaved(); syncProps();
+  toast('Text seedha ho gaya');
+}
 function setCharSpacing(v){ const o=active(); if(o){ o.set('charSpacing', parseInt(v)||0); canvas.renderAll(); } }
 function setTextBg(v){ const o=active(); if(o){ o.set('textBackgroundColor', v); canvas.renderAll(); } }
 function clearTextBg(){ const o=active(); if(o){ o.set('textBackgroundColor', ''); canvas.renderAll(); } }
@@ -755,6 +831,25 @@ function syncImgCtx(){
     document.getElementById('btnSepia').style.background = f.sepia ? '#efe9ff' : '';
   }
 }
+/* ---- QR code element ---- */
+function addQRCode(){
+  const inp = document.getElementById('qrText');
+  const val = ((inp && inp.value) || '').trim() || 'https://kanva.weblitex.com';
+  if (typeof qrcode === 'undefined'){ toast('⚠️ QR library load nahi hui — internet check karke dobara try karein'); return; }
+  try {
+    const qr = qrcode(0, 'M'); qr.addData(val); qr.make();
+    const n = qr.getModuleCount(); const cell = 12; const pad = cell * 2;
+    const cv = document.createElement('canvas'); cv.width = cv.height = n * cell + pad * 2;
+    const g = cv.getContext('2d'); g.fillStyle = '#ffffff'; g.fillRect(0, 0, cv.width, cv.height); g.fillStyle = '#111111';
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) g.fillRect(pad + c * cell, pad + r * cell, cell, cell);
+    fabric.Image.fromURL(cv.toDataURL('image/png'), img => {
+      img.scaleToWidth(currentSize.w * .34); img.set({ name: 'QR Code' });
+      center(img); pushHistory(); markUnsaved();
+      toast('✅ QR code canvas par lag gaya');
+    });
+  } catch(e){ toast('⚠️ QR nahi bana — text thora chhota karke try karein'); }
+}
+
 /* ---- Draw (freehand) ---- */
 let drawing = false;
 function toggleDraw(){
@@ -802,10 +897,15 @@ function renderLayers(){
     const idx = canvas.getObjects().indexOf(o);
     const label = (['textbox','i-text','text'].includes(o.type) && o.text) ? o.text.slice(0,18) : (o.name || o.type);
     return `<div class="layer-item ${active()===o?'active':''}" onclick="selectLayer(${idx})"><span class="lname">${escapeHtml(label)}</span>
-      <button onclick="event.stopPropagation();toggleVis(${idx})">${o.visible===false?'🚫':'👁️'}</button>
-      <button onclick="event.stopPropagation();delLayer(${idx})">🗑️</button></div>`;
+      <button class="lbtn" title="Layer upar" onclick="event.stopPropagation();layerMove(${idx},1)">⬆</button>
+      <button class="lbtn" title="Layer neeche" onclick="event.stopPropagation();layerMove(${idx},-1)">⬇</button>
+      <button class="lbtn" title="Lock / unlock" onclick="event.stopPropagation();layerLock(${idx})">${o.__locked?'🔒':'🔓'}</button>
+      <button class="lbtn" onclick="event.stopPropagation();toggleVis(${idx})">${o.visible===false?'🚫':'👁️'}</button>
+      <button class="lbtn" onclick="event.stopPropagation();delLayer(${idx})">🗑️</button></div>`;
   }).join('');
 }
+function layerMove(i, dir){ const o = canvas.getObjects()[i]; if (!o) return; if (dir > 0) o.bringForward(); else o.sendBackwards(); canvas.renderAll(); pushHistory(); markUnsaved(); renderLayers(); }
+function layerLock(i){ const o = canvas.getObjects()[i]; if (!o) return; const locked = !o.__locked; o.__locked = locked; o.set({ lockMovementX: locked, lockMovementY: locked, lockRotation: locked, lockScalingX: locked, lockScalingY: locked, hasControls: !locked }); canvas.renderAll(); pushHistory(); markUnsaved(); renderLayers(); if (active() === o) syncProps(); }
 function selectLayer(i){ const o = canvas.getObjects()[i]; if (o){ canvas.setActiveObject(o); canvas.renderAll(); syncProps(); } }
 function toggleVis(i){ const o = canvas.getObjects()[i]; if (o){ o.visible = o.visible === false ? true : false; canvas.renderAll(); renderLayers(); } }
 function delLayer(i){ const o = canvas.getObjects()[i]; if (o) canvas.remove(o); }
@@ -1363,7 +1463,7 @@ function startBlank(sizeId){
 /* ================= SAVE / LOAD ================= */
 function designSnapshot(){
   canvas.discardActiveObject(); canvas.renderAll();
-  return { json: JSON.stringify(canvas.toJSON(['selectable','evented','name','__locked','__f'])),
+  return { json: JSON.stringify(canvas.toJSON(['selectable','evented','name','__locked','__f','__curve','__grad'])),
     bg: typeof canvas.backgroundColor === 'string' ? canvas.backgroundColor : '#ffffff',
     thumb: canvas.toDataURL({ format:'jpeg', quality:.6, multiplier: Math.min(300/currentSize.w, 1) }) };
 }
@@ -1405,7 +1505,7 @@ function parseShareHash(){
 function openShare(){
   if (!canvas) return;
   saveDesign(false);
-  const link = location.origin + location.pathname + '#d=' + btoa(unescape(encodeURIComponent(JSON.stringify(canvas.toJSON(['selectable','evented','name','__locked','__f'])))));
+  const link = location.origin + location.pathname + '#d=' + btoa(unescape(encodeURIComponent(JSON.stringify(canvas.toJSON(['selectable','evented','name','__locked','__f','__curve','__grad'])))));
   document.getElementById('shareLink').value = link;
   openModal('shareModal');
 }
@@ -1465,6 +1565,17 @@ function withWatermark(fn){
   document.getElementById('exportMenu').style.display = 'none';
 }
 function exportPNG(mult){ if (mult > 1 && !isPro()){ requirePro('HD export'); return; } withWatermark(() => downloadURI(canvas.toDataURL({ format:'png', multiplier: mult }), 'kanva-design.png')); toast('⬇️ PNG downloaded' + (mult > 1 ? ' (HD)' : '')); }
+function exportTransparent(){
+  const prevBg = canvas.backgroundColor;
+  withWatermark(() => {
+    canvas.backgroundColor = '';
+    canvas.renderAll();
+    downloadURI(canvas.toDataURL({ format: 'png', multiplier: 1 }), 'kanva-design-transparent.png');
+    canvas.backgroundColor = prevBg;
+    canvas.renderAll();
+  });
+  toast('⬇️ Transparent PNG downloaded');
+}
 function exportJPG(){ withWatermark(() => downloadURI(canvas.toDataURL({ format:'jpeg', quality:.92 }), 'kanva-design.jpg')); toast('⬇️ JPG downloaded'); }
 function exportPDF(){ withWatermark(() => { const { jsPDF } = window.jspdf; const pdf = new jsPDF({ orientation: currentSize.w >= currentSize.h ? 'landscape' : 'portrait', unit:'px', format:[currentSize.w, currentSize.h], hotfixes:['px_scaling'] }); pdf.addImage(canvas.toDataURL({ format:'jpeg', quality:.92 }), 'JPEG', 0, 0, currentSize.w, currentSize.h); pdf.save('kanva-design.pdf'); }); toast('⬇️ PDF downloaded'); }
 
@@ -1698,9 +1809,23 @@ googleWatchdog();
 
 
 /* ================= ACCOUNT / PROFILE ================= */
-function renderAccount(){
+async function renderAccount(){
   if (!currentUser) return;
-  const pic = (cloudMode && profileRow && profileRow.picture) || currentUser.picture || '';
+  // Cloud session hai to profile hamesha server se taza le lo — taake
+  // page par kabhi khali/dummy data na dikhe. (Pehle yahan kabhi define hi
+  // na hue `cloudMode`/`sbUser` naam istemal ho rahe thay, jin ki wajah se
+  // ye function pehli line par hi ReferenceError de kar ruk jata tha aur
+  // avatar "U", naam aur email khali reh jate thay.)
+  if (isCloud() && sb && cloudUser){
+    try {
+      const r = await sb.from('profiles').select('*').eq('id', cloudUser.id).maybeSingle();
+      if (r && r.data){
+        profileRow = r.data;
+        currentUser = { name: r.data.name || currentUser.name || (r.data.email || '').split('@')[0] || 'User', email: r.data.email || currentUser.email || '', picture: r.data.picture || currentUser.picture || '' };
+      }
+    } catch(e){}
+  }
+  const pic = (isCloud() && profileRow && profileRow.picture) || currentUser.picture || '';
   const av = document.getElementById('accAvatar');
   if (av){ if (pic){ av.style.backgroundImage = 'url(' + pic + ')'; av.style.backgroundSize = 'cover'; av.textContent = ''; } else { av.style.backgroundImage = ''; av.textContent = (currentUser.name || 'U').trim().charAt(0).toUpperCase(); } }
   const nm = document.getElementById('accName'); if (nm) nm.value = currentUser.name || '';
@@ -1708,15 +1833,15 @@ function renderAccount(){
   const pl = document.getElementById('accPlan');
   if (pl){ const pro = isPro(); pl.textContent = pro ? '⚡ PRO' : 'FREE'; pl.className = 'plan-badge ' + (pro ? 'pro' : 'free'); }
   const meta = document.getElementById('accMeta');
-  if (meta) meta.textContent = cloudMode ? 'Account cloud se synced hai — designs har device par milte hain.' : 'Demo account — data is browser mein rehta hai.';
+  if (meta) meta.textContent = isCloud() ? 'Account cloud se synced hai — designs har device par milte hain.' : 'Demo account — data is browser mein rehta hai.';
 }
 async function saveProfileName(){
   const inp = document.getElementById('accName'); if (!inp) return;
   const v = inp.value.trim(); if (!v){ toast('⚠️ Naam likhein pehle'); return; }
   currentUser.name = v;
   const un = document.getElementById('userName'); if (un) un.textContent = v;
-  if (cloudMode && sb && sbUser){
-    const { error } = await sb.from('profiles').update({ name: v }).eq('id', sbUser.id);
+  if (isCloud() && sb && cloudUser){
+    const { error } = await sb.from('profiles').update({ name: v }).eq('id', cloudUser.id);
     if (error){ toast('⚠️ Naam save nahi hua — dobara try karein'); return; }
     if (profileRow) profileRow.name = v;
   }
