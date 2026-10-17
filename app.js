@@ -20,6 +20,7 @@ const SIZES = [
   { id:'pres',     name:'Presentation',      w:1920, h:1080, icon:'pres' },
   { id:'poster',   name:'Poster',            w:794,  h:1123, icon:'poster' },
   { id:'fb-cover', name:'Facebook Cover',    w:1640, h:924,  icon:'cover' },
+  { id:'whiteboard', name:'Whiteboard',      w:2560, h:1440, icon:'pres' },
 ];
 const FONTS = ['Poppins','Inter','Noto Nastaliq Urdu','Montserrat','Roboto','Oswald','Bebas Neue','Playfair Display','Pacifico','Dancing Script','Anton','Lobster','Arial','Georgia','Verdana','Courier New'];
 
@@ -117,7 +118,7 @@ async function afterAuth(user, silent){
 function rowToDesign(r){
   const d = r.data || {};
   return { id: r.id, name: r.name, sizeId: r.size_id, sizeName: r.size_name, sizeW: r.size_w, sizeH: r.size_h,
-           json: d.json, bg: d.bg, thumb: d.thumb, pages: d.pages || null, folder: d.folder || '', notes: d.notes || null, comments: d.comments || null, versions: d.versions || null, trashed: !!r.trashed,
+           json: d.json, bg: d.bg, thumb: d.thumb, pages: d.pages || null, folder: d.folder || '', notes: d.notes || null, comments: d.comments || null, versions: d.versions || null, videos: d.videos || null, pageDurs: d.pageDurs || null, trashed: !!r.trashed,
            updated: r.updated_at ? new Date(r.updated_at).toLocaleString() : '' };
 }
 function fingerprintOf(d){
@@ -152,7 +153,7 @@ async function migrateLocalDesigns(){
     const local = JSON.parse(localStorage.getItem(key) || '[]');
     if (!local.length || localStorage.getItem('kv_migrated3_' + currentUser.email)) return;
     const rows = local.map(d => ({ id: d.id, user_id: cloudUser.id, name: d.name, size_id: d.sizeId, size_name: d.sizeName,
-      size_w: d.sizeW, size_h: d.sizeH, data: { json: d.json, bg: d.bg, thumb: d.thumb, pages: d.pages || null, folder: d.folder || '', notes: d.notes || null, comments: d.comments || null, versions: d.versions || null }, trashed: !!d.trashed }));
+      size_w: d.sizeW, size_h: d.sizeH, data: { json: d.json, bg: d.bg, thumb: d.thumb, pages: d.pages || null, folder: d.folder || '', notes: d.notes || null, comments: d.comments || null, versions: d.versions || null, videos: d.videos || null, pageDurs: d.pageDurs || null }, trashed: !!d.trashed }));
     const { error } = await sb.from('designs').insert(rows);
     if (!error){
       designsCache = local.slice();
@@ -328,6 +329,7 @@ function requirePro(feature){ if (isPro()) return true; toast('🔒 ' + feature 
 
 /* ---------------- APP SHELL ---------------- */
 function enterApp(){
+  collabStop();
   document.getElementById('view-auth').style.display = 'none';
   document.getElementById('view-editor').style.display = 'none';
   document.getElementById('view-app').style.display = '';
@@ -515,7 +517,7 @@ function openEditor(sizeId, tplId){
   document.getElementById('view-editor').style.display = '';
   if (!editorCanvas) initCanvas(); else if (canvas !== editorCanvas) canvas = editorCanvas;
   if (sizeId) setSize(sizeId);
-  resetPages(null, 0); docNotes = []; docComments = [];
+  resetPages(null, 0); docNotes = []; docComments = []; docVideos = {}; docPageDurs = {}; collabStop();
   if (tplId) applyTemplate(tplId);
   const sp = document.querySelector('.sidepanel');
   if (sp && window.innerWidth <= 900) sp.classList.remove('open');
@@ -565,7 +567,7 @@ function initCanvas(){
   });
   buildSidebars(); renderUploads(); renderPhotos(); pushHistory(true);
 }
-function markUnsaved(){ document.getElementById('savedNote').textContent = '● Unsaved changes'; scheduleAutosave(); }
+function markUnsaved(){ document.getElementById('savedNote').textContent = '● Unsaved changes'; scheduleAutosave(); collabSend(); }
 let autosaveTimer = null;
 function scheduleAutosave(){
   if (!currentDesignId) return;
@@ -599,7 +601,7 @@ function zoomOut(){ zoom = Math.max(.07, zoom / 1.15); applyZoom(); }
 /* history */
 function pushHistory(init){
   if (saving) return;
-  const json = JSON.stringify(canvas.toJSON(['selectable','evented','name','__locked','__f','__curve','__grad','__anim','__origFont']));
+  const json = JSON.stringify(canvas.toJSON(['selectable','evented','name','__locked','__f','__curve','__grad','__anim','__origFont','__isVideo']));
   if (!init && history[hIndex] === json) return;
   history = history.slice(0, hIndex + 1); history.push(json);
   if (history.length > 60) history.shift();
@@ -793,6 +795,7 @@ function syncProps(){
   if (ga && gb){ if (o.__grad){ ga.value = o.__grad.a; gb.value = o.__grad.b; } else if (typeof o.fill === 'string'){ ga.value = o.fill; } }
   const pcv = document.getElementById('pCurve'); if (pcv && o.__curve) pcv.value = o.__curve.angle;
   const pa = document.getElementById('pAnim'); if (pa) pa.value = o.__anim ? o.__anim.type : '';
+  const vc = document.getElementById('vidCtx'); if (vc) vc.style.display = o.__isVideo ? '' : 'none';
   document.getElementById('pOpacity').value = Math.round((o.opacity ?? 1) * 100);
   if (isText){
     document.getElementById('pFont').value = o.fontFamily || 'Poppins';
@@ -1590,14 +1593,18 @@ function startBlank(sizeId){
 
 /* ================= MULTI-PAGE ================= */
 let docPages = null, docPageIdx = 0;
-const PAGE_JSON_PROPS = ['selectable','evented','name','__locked','__f','__curve','__grad','__anim','__origFont'];
-function capturePage(){ return { json: stripPins(JSON.stringify(canvas.toJSON(PAGE_JSON_PROPS))), bg: typeof canvas.backgroundColor === 'string' ? canvas.backgroundColor : '#ffffff' }; }
+let docVideos = {};
+let docPageDurs = {};
+const PAGE_JSON_PROPS = ['selectable','evented','name','__locked','__f','__curve','__grad','__anim','__origFont','__isVideo'];
+function capturePage(){ if (canvas) docVideos[docPageIdx] = captureVideos(); return { json: stripPins(JSON.stringify(canvas.toJSON(PAGE_JSON_PROPS))), bg: typeof canvas.backgroundColor === 'string' ? canvas.backgroundColor : '#ffffff' }; }
 function emptyPage(){ return { json: JSON.stringify({ version: '5.3.0', objects: [], background: '#ffffff' }), bg: '#ffffff' }; }
-function applyPage(p){
+function applyPage(p, done){
   saving = true;
   canvas.loadFromJSON(p.json, () => {
     canvas.setBackgroundColor(p.bg || '#ffffff', () => {});
+    recreateVideos(docPageIdx);
     canvas.renderAll(); saving = false; history = []; hIndex = -1; pushHistory(true); renderLayers(); renderPageStrip();
+    if (done) done();
   });
 }
 function ensurePages(){ if (!docPages){ docPages = [capturePage()]; docPageIdx = 0; } }
@@ -1641,22 +1648,23 @@ function renderPageStrip(){
   strip.style.display = '';
   let h = '<span class="ps-lbl">Pages</span>';
   for (let i = 0; i < n; i++) h += `<button class="ps-btn ${i === docPageIdx ? 'active' : ''}" onclick="switchPage(${i})">${i + 1}</button>`;
-  h += `<button class="ps-btn add" onclick="addPage()" title="Add page">＋</button><button class="ps-btn" onclick="dupPage()" title="Duplicate page">⧉</button><button class="ps-btn" onclick="movePage(-1)" title="Page peeche">◀</button><button class="ps-btn" onclick="movePage(1)" title="Page aage">▶</button><button class="ps-btn danger" onclick="delPage()" title="Delete page">🗑</button>`;
+  h += `<button class="ps-btn add" onclick="addPage()" title="Add page">＋</button><button class="ps-btn" onclick="dupPage()" title="Duplicate page">⧉</button><button class="ps-btn" onclick="movePage(-1)" title="Page peeche">◀</button><button class="ps-btn" onclick="movePage(1)" title="Page aage">▶</button><button class="ps-btn danger" onclick="delPage()" title="Delete page">🗑</button><button class="ps-btn" onclick="setPageDur()" title="Video mein is page ki duration (seconds)">⏱ ${(docPageDurs && docPageDurs[docPageIdx]) || 3}s</button>`;
   strip.innerHTML = h;
 }
 function resetPages(pages, idx){ docPages = pages ? JSON.parse(JSON.stringify(pages)) : null; docPageIdx = idx || 0; renderPageStrip(); }
 
 /* ================= SAVE / LOAD ================= */
 function stripPins(jsonStr){
-  try { const o = JSON.parse(jsonStr); o.objects = (o.objects || []).filter(x => x.name !== '__pin'); return JSON.stringify(o); }
+  try { const o = JSON.parse(jsonStr); o.objects = (o.objects || []).filter(x => x.name !== '__pin' && !x.__isVideo); return JSON.stringify(o); }
   catch(e){ return jsonStr; }
 }
 function designSnapshot(){
+  ensurePages();
   setPinsVisible(false);
   canvas.discardActiveObject(); canvas.renderAll();
   let pages = null;
   if (docPages){ docPages[docPageIdx] = capturePage(); pages = JSON.parse(JSON.stringify(docPages)); }
-  const snapOut = { pages, pageIndex: docPageIdx, notes: docNotes.slice(), comments: JSON.parse(JSON.stringify(docComments)), json: stripPins(JSON.stringify(canvas.toJSON(['selectable','evented','name','__locked','__f','__curve','__grad','__anim','__origFont']))),
+  const snapOut = { pages, pageIndex: docPageIdx, notes: docNotes.slice(), comments: JSON.parse(JSON.stringify(docComments)), videos: JSON.parse(JSON.stringify(docVideos)), pageDurs: Object.assign({}, docPageDurs), json: stripPins(JSON.stringify(canvas.toJSON(['selectable','evented','name','__locked','__f','__curve','__grad','__anim','__origFont','__isVideo']))),
     bg: typeof canvas.backgroundColor === 'string' ? canvas.backgroundColor : '#ffffff',
     thumb: canvas.toDataURL({ format:'jpeg', quality:.6, multiplier: Math.min(300/currentSize.w, 1) }) };
   setPinsVisible(true);
@@ -1676,6 +1684,7 @@ function saveDesign(manual){
     ds.unshift(rec); saveDesigns(ds); currentDesignId = rec.id;
   }
   document.getElementById('savedNote').textContent = '✓ Saved';
+  collabStart(currentDesignId);
   if (manual) toast('💾 Design saved to Your projects');
 }
 function loadDesign(id){
@@ -1688,6 +1697,7 @@ function loadDesign(id){
     canvas.setBackgroundColor(d.bg || '#ffffff', () => {});
     canvas.renderAll(); saving = false; history = []; hIndex = -1; pushHistory(true); renderLayers(); fitZoom();
     resetPages(d.pages, d.pageIndex || 0); docNotes = d.notes || []; docComments = d.comments || []; rebuildPins();
+    docVideos = d.videos || {}; docPageDurs = d.pageDurs || {}; recreateVideos(docPageIdx); collabStart(d.id);
     currentDesignId = d.id; document.getElementById('docTitle').value = d.name;
     document.getElementById('savedNote').textContent = '✓ Saved';
   });
@@ -1701,7 +1711,7 @@ function parseShareHash(){
 function openShare(){
   if (!canvas) return;
   saveDesign(false);
-  const link = location.origin + location.pathname + '#d=' + btoa(unescape(encodeURIComponent(JSON.stringify(canvas.toJSON(['selectable','evented','name','__locked','__f','__curve','__grad','__anim','__origFont'])))));
+  const link = location.origin + location.pathname + '#d=' + btoa(unescape(encodeURIComponent(JSON.stringify(canvas.toJSON(['selectable','evented','name','__locked','__f','__curve','__grad','__anim','__origFont','__isVideo'])))));
   document.getElementById('shareLink').value = link;
   openModal('shareModal');
 }
@@ -1899,32 +1909,113 @@ function exportGIF(){
   }).catch(() => { restoreAnim(tl.objs); toast('⚠️ GIF nahi bana — internet check karke dobara try karein'); });
 }
 /* ---- Video export (MediaRecorder) ---- */
-function exportVideo(){
-  const tl = animTimeline();
-  if (!tl.objs.some(o => o.__anim)){ toast('ℹ️ Video ke liye pehle elements ko animation dein'); tl.objs.forEach(o => delete o.__rest); return; }
-  const mime = ['video/mp4', 'video/webm;codecs=vp9', 'video/webm'].find(m => { try { return window.MediaRecorder && MediaRecorder.isTypeSupported(m); } catch(e){ return false; } });
-  if (!mime){ toast('⚠️ Is browser mein video recording support nahi hai'); tl.objs.forEach(o => delete o.__rest); return; }
-  toast('🎥 Video record ho raha hai…');
+/* ================= VIDEO OBJECTS ================= */
+let videoRenderLoop = false;
+function canvasHasVideo(){ return !!(canvas && canvas.getObjects().some(o => o.__isVideo)); }
+function ensureVideoLoop(){
+  if (videoRenderLoop) return; videoRenderLoop = true;
+  const tick = () => {
+    const ve = document.getElementById('view-editor');
+    if (!canvas || !ve || ve.style.display === 'none'){ videoRenderLoop = false; return; }
+    if (canvasHasVideo()) canvas.renderAll();
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+function captureVideos(){
+  if (!canvas) return [];
+  return canvas.getObjects().filter(o => o.__isVideo && o.__videoSrc).map(o => ({ left: Math.round(o.left), top: Math.round(o.top), scaleX: o.scaleX, scaleY: o.scaleY, angle: o.angle || 0, src: o.__videoSrc }));
+}
+function recreateVideos(i){
+  if (!canvas) return;
+  (docVideos[i] || []).forEach(v => {
+    const el = document.createElement('video');
+    el.src = v.src; el.loop = true; el.muted = true; el.playsInline = true;
+    const img = new fabric.Image(el, { left: v.left, top: v.top, angle: v.angle || 0, name: 'Video' });
+    img.scaleX = v.scaleX; img.scaleY = v.scaleY;
+    img.__isVideo = true; img.__videoEl = el; img.__videoSrc = v.src;
+    el.onloadeddata = () => { el.play().catch(() => {}); canvas.renderAll(); };
+    canvas.add(img);
+  });
+  if ((docVideos[i] || []).length) ensureVideoLoop();
+}
+function addVideoFile(file){
+  if (!file) return;
+  if (file.size > 15 * 1024 * 1024){ toast('⚠️ Video bohat bara hai — 15MB tak ki choti clip use karein'); return; }
+  const small = file.size <= 4 * 1024 * 1024;
+  const place = src => {
+    const el = document.createElement('video');
+    el.src = src; el.loop = true; el.muted = true; el.playsInline = true;
+    el.onloadedmetadata = () => {
+      const img = new fabric.Image(el, { left: currentSize.w * .2, top: currentSize.h * .25, name: 'Video' });
+      if (img.width > currentSize.w * .6) img.scaleToWidth(currentSize.w * .6);
+      img.__isVideo = true; img.__videoEl = el; img.__videoSrc = small ? src : '';
+      canvas.add(img); canvas.setActiveObject(img); canvas.renderAll();
+      el.play().catch(() => {});
+      ensureVideoLoop(); pushHistory(); markUnsaved();
+      toast(small ? '🎬 Video lag gaya — design ke sath save bhi hoga' : '🎬 Video lag gaya — NOTE: 4MB se bara video sirf is session ke liye hai, save nahi hoga');
+    };
+    el.onerror = () => toast('⚠️ Ye video format nahi chala — MP4 try karein');
+  };
+  if (small){ const rd = new FileReader(); rd.onload = () => place(rd.result); rd.readAsDataURL(file); }
+  else place(URL.createObjectURL(file));
+}
+function toggleVideoPlay(){
+  const o = active();
+  if (!o || !o.__isVideo || !o.__videoEl){ toast('⚠️ Pehle ek video select karein'); return; }
+  if (o.__videoEl.paused){ o.__videoEl.play().catch(() => {}); toast('▶️ Video play'); }
+  else { o.__videoEl.pause(); toast('⏸️ Video pause'); }
+  canvas.renderAll();
+}
+function setPageDur(){
+  const cur = docPageDurs[docPageIdx] || 3;
+  const v = parseFloat(prompt('Video export mein ye page kitne seconds rukay? (1–10)', String(cur)));
+  if (!v || isNaN(v)) return;
+  docPageDurs[docPageIdx] = Math.max(1, Math.min(10, v));
+  renderPageStrip(); markUnsaved();
+  toast('⏱ Page ' + (docPageIdx + 1) + ' ki duration: ' + docPageDurs[docPageIdx] + 's');
+}
+function runTimelineFor(tl, seconds){
+  return new Promise(res => {
+    const t0 = performance.now();
+    const step = () => {
+      const t = (performance.now() - t0) / 1000;
+      if (t >= seconds){ res(); return; }
+      applyAnimAt(tl.objs, Math.min(t, tl.total));
+      requestAnimationFrame(step);
+    };
+    step();
+  });
+}
+async function exportVideo(){
+  if (!canvas) return;
+  const mime = ['video/mp4', 'video/webm;codecs=vp9', 'video/webm'].find(mm => { try { return window.MediaRecorder && MediaRecorder.isTypeSupported(mm); } catch(e){ return false; } });
+  if (!mime){ toast('⚠️ Is browser mein video recording support nahi hai'); return; }
+  ensurePages();
+  docPages[docPageIdx] = capturePage();
+  const origIdx = docPageIdx;
+  toast('🎥 Video record ho raha hai — ' + docPages.length + ' page(s), sabr karein…');
   canvas.discardActiveObject(); setPinsVisible(false); canvas.renderAll();
   const stream = canvas.lowerCanvasEl.captureStream(30);
   const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 5000000 });
   const chunks = [];
   rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
-  rec.onstop = () => {
-    restoreAnim(tl.objs); setPinsVisible(true);
-    const blob = new Blob(chunks, { type: mime.split(';')[0] });
-    downloadURI(URL.createObjectURL(blob), mime.startsWith('video/mp4') ? 'kanva-video.mp4' : 'kanva-video.webm');
-    toast('⬇️ Video downloaded');
-  };
+  const stopped = new Promise(res => { rec.onstop = res; });
   rec.start(200);
-  const t0 = performance.now();
-  const step = () => {
-    const t = (performance.now() - t0) / 1000;
-    if (t >= tl.total){ rec.stop(); return; }
-    applyAnimAt(tl.objs, t);
-    requestAnimationFrame(step);
-  };
-  step();
+  for (let i = 0; i < docPages.length; i++){
+    await new Promise(res => applyPage(docPages[i], res));
+    const tl = animTimeline();
+    const hold = Math.max(tl.total, docPageDurs[i] || 0, tl.objs.some(o => o.__anim) ? 0 : 2.6);
+    await runTimelineFor(tl, hold);
+    restoreAnim(tl.objs);
+  }
+  rec.stop();
+  await stopped;
+  setPinsVisible(true);
+  const blob = new Blob(chunks, { type: mime.split(';')[0] });
+  downloadURI(URL.createObjectURL(blob), mime.startsWith('video/mp4') ? 'kanva-video.mp4' : 'kanva-video.webm');
+  if (origIdx !== docPageIdx) applyPage(docPages[origIdx]);
+  toast('⬇️ Video downloaded — ' + docPages.length + ' pages ki film');
 }
 /* ================= PRESENTATION ================= */
 let presentState = { slides: [], idx: 0, timer: null, secs: 0 };
@@ -2086,30 +2177,96 @@ function exportSVG(){
   downloadURI(URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' })), 'kanva-design.svg');
   toast('⬇️ SVG downloaded');
 }
+
+/* ================= LIVE COLLAB (Supabase Realtime) ================= */
+let collabChannel = null, collabApplying = false, collabUserTag = '', collabTimer = null;
+function collabStart(designId){
+  collabStop();
+  if (!isCloud() || !designId || !window.supabase) return;
+  collabUserTag = (cloudUser && cloudUser.email ? cloudUser.email.split('@')[0] : 'user') + '-' + Math.random().toString(36).slice(2, 6);
+  try {
+    collabChannel = sb.channel('kanva-design-' + designId, { config: { presence: { key: collabUserTag } } });
+    collabChannel.on('broadcast', { event: 'sync' }, msg => {
+      if (!msg.payload || msg.payload.from === collabUserTag || collabApplying || !canvas) return;
+      collabApplying = true;
+      canvas.loadFromJSON(msg.payload.json, () => {
+        canvas.setBackgroundColor(msg.payload.bg || '#ffffff', () => {});
+        canvas.renderAll(); renderLayers(); collabApplying = false;
+        const el = document.getElementById('collabNote');
+        if (el) el.textContent = '🔄 Live update mila';
+      });
+    });
+    collabChannel.on('presence', { event: 'sync' }, () => {
+      if (!collabChannel) return;
+      const n = Object.keys(collabChannel.presenceState()).length;
+      const el = document.getElementById('collabNote');
+      if (el && n > 1) el.textContent = '🟢 ' + n + ' log live hain is design par';
+      else if (el && el.textContent.startsWith('🟢')) el.textContent = '';
+    });
+    collabChannel.subscribe(async status => { if (status === 'SUBSCRIBED'){ try { await collabChannel.track({ at: Date.now() }); } catch(e){} } });
+  } catch(e){}
+}
+function collabStop(){ if (collabChannel){ try { sb.removeChannel(collabChannel); } catch(e){} collabChannel = null; } }
+function collabSend(){
+  if (!collabChannel || collabApplying) return;
+  clearTimeout(collabTimer);
+  collabTimer = setTimeout(() => {
+    if (!collabChannel || !canvas) return;
+    try { collabChannel.send({ type: 'broadcast', event: 'sync', payload: { from: collabUserTag, json: stripPins(JSON.stringify(canvas.toJSON(PAGE_JSON_PROPS))), bg: typeof canvas.backgroundColor === 'string' ? canvas.backgroundColor : '#ffffff' } }); } catch(e){}
+  }, 900);
+}
+
 /* ================= AI TOOLS ================= */
 let aiQuota = { day: '', img: 0, write: 0 };
 function loadAiQuota(){ try { const q = JSON.parse(localStorage.getItem('kv_ai_quota') || 'null'); const today = new Date().toDateString(); if (q && q.day === today) aiQuota = q; else aiQuota = { day: today, img: 0, write: 0 }; } catch(e){ aiQuota = { day: new Date().toDateString(), img: 0, write: 0 }; } }
 function saveAiQuota(){ try { localStorage.setItem('kv_ai_quota', JSON.stringify(aiQuota)); } catch(e){} }
 function quotaLeft(kind){ const lim = isPro() ? 30 : (kind === 'img' ? 3 : 5); return lim - (aiQuota[kind] || 0); }
 loadAiQuota();
-async function removeBg(){
-  const o = active();
-  if (!o || o.type !== 'image'){ toast('⚠️ Pehle ek photo select karein'); return; }
-  if (!isPro()){ requirePro('Background Remover (AI)'); return; }
-  toast('🤖 Background remove ho raha hai — pehli dafa library download hogi, thora waqt lagega…');
-  try {
-    const mod = await import('https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.5.5/+esm');
-    const blob = await mod.removeBackground(o.getSrc(), { output: { format: 'image/png', quality: 1 } });
-    const url = URL.createObjectURL(blob);
-    fabric.Image.fromURL(url, img => {
+async function getSubjectBlob(o){
+  const mod = await import('https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.5.5/+esm');
+  return mod.removeBackground(o.getSrc(), { output: { format: 'image/png', quality: 1 } });
+}
+function swapImage(o, src){
+  return new Promise(res => {
+    fabric.Image.fromURL(src, img => {
+      if (!img){ res(); return; }
       img.set({ left: o.left, top: o.top, scaleX: o.scaleX, scaleY: o.scaleY, angle: o.angle, name: o.name || 'Photo' });
       const idx = canvas.getObjects().indexOf(o);
       canvas.remove(o);
       if (idx >= 0) canvas.insertAt(img, idx); else canvas.add(img);
       canvas.setActiveObject(img); canvas.renderAll(); pushHistory(); markUnsaved();
-      toast('✅ Background remove ho gaya');
+      res();
     });
-  } catch(e){ toast('⚠️ Background remove nahi hua — internet check karke dobara try karein'); }
+  });
+}
+async function removeBg(){ return bgStudio('remove'); }
+async function bgStudio(mode){
+  const o = active();
+  if (!o || o.type !== 'image'){ toast('⚠️ Pehle ek photo select karein'); return; }
+  if (!isPro()){ requirePro('BG Studio (AI)'); return; }
+  toast('🤖 BG Studio kaam kar raha hai — pehli dafa library download hogi, thora waqt lagega…');
+  try {
+    const subjBlob = await getSubjectBlob(o);
+    const subjUrl = URL.createObjectURL(subjBlob);
+    if (mode === 'remove'){ await swapImage(o, subjUrl); toast('✅ Background remove ho gaya'); return; }
+    const orig = new Image(); orig.crossOrigin = 'anonymous';
+    await new Promise((res, rej) => { orig.onload = res; orig.onerror = rej; orig.src = o.getSrc(); });
+    const subj = new Image();
+    await new Promise((res, rej) => { subj.onload = res; subj.onerror = rej; subj.src = subjUrl; });
+    const W = orig.naturalWidth || subj.naturalWidth, H = orig.naturalHeight || subj.naturalHeight;
+    if (!W || !H) throw new Error('size');
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const g = cv.getContext('2d');
+    if (mode === 'blur'){ g.filter = 'blur(24px)'; g.drawImage(orig, -30, -30, W + 60, H + 60); g.filter = 'none'; }
+    else {
+      const col = prompt('Background color likhein (jaise #8b3dff, white, #111827):', '#8b3dff');
+      if (!col) return;
+      g.fillStyle = col; g.fillRect(0, 0, W, H);
+    }
+    g.drawImage(subj, 0, 0, W, H);
+    await swapImage(o, cv.toDataURL('image/png'));
+    toast(mode === 'blur' ? '✅ Portrait style: background blur ho gaya' : '✅ Background color badal gaya');
+  } catch(e){ toast('⚠️ BG Studio nahi chala — internet/photo check karke dobara try karein'); }
 }
 async function generateAiImage(){
   const inp = document.getElementById('aiPrompt');
@@ -2172,6 +2329,23 @@ async function translateDesign(){
   toast('🌐 Translate mukammal: ' + done + ' ho gaye' + (failed ? ', ' + failed + ' nahi hue (rozana limit)' : ''));
 }
 
+/* ================= WHITEBOARD KIT ================= */
+function addSticky(color){
+  const g = new fabric.Group([
+    new fabric.Rect({ left: 0, top: 0, width: 250, height: 190, fill: color || '#fef08a', rx: 10, ry: 10, shadow: { color: 'rgba(0,0,0,.25)', blur: 14, offsetY: 5 } }),
+    new fabric.Textbox('Note…', { left: 18, top: 16, width: 214, fontSize: 26, fontFamily: 'Inter', fill: '#713f12', lineHeight: 1.3 })
+  ], { left: currentSize.w / 2 - 125, top: currentSize.h / 2 - 95, name: 'Sticky Note' });
+  canvas.add(g); canvas.setActiveObject(g); canvas.renderAll(); pushHistory(); markUnsaved();
+  toast('🗒️ Sticky note lag gaya — edit ke liye Ungroup karein');
+}
+function addArrow(){
+  const g = new fabric.Group([
+    new fabric.Line([0, 25, 190, 25], { stroke: '#111827', strokeWidth: 9 }),
+    new fabric.Triangle({ left: 178, top: 4, width: 42, height: 42, fill: '#111827', angle: 90 })
+  ], { left: currentSize.w / 2 - 110, top: currentSize.h / 2 - 25, name: 'Arrow' });
+  canvas.add(g); canvas.setActiveObject(g); canvas.renderAll(); pushHistory(); markUnsaved();
+  toast('➡️ Arrow lag gaya — ghuma kar direction dein');
+}
 function setPinsVisible(v){
   if (!canvas) return;
   canvas.getObjects().forEach(o => { if (o.name === '__pin') o.visible = v; });
@@ -2691,3 +2865,237 @@ Object.assign(BUILDERS, {
     pill('SATURDAY · 5 PM', .5, .66, .44, '#fde047', '#831843', .03);
     addAt(T('At home — friends & cousins are invited!', { fontFamily:'Inter', fontSize:W*.026, fill:'rgba(255,255,255,.8)', width:W*.75 }), .5, .82); }
 });
+/* ================= WAVE 5 TEMPLATES (33) ================= */
+TEMPLATES.push(
+ { id:'agency', title:'Digital Agency', sub:'Marketing agency promo', cat:'Business', pro:true, size:'ig-post', bg:['#0f172a','#1e3a8a'] },
+ { id:'clinic', title:'City Clinic', sub:'Clinic & health services', cat:'Business', pro:false, size:'ig-post', bg:['#ecfeff','#06b6d4'] },
+ { id:'pharmacy', title:'Pharmacy Plus', sub:'Medicine & care', cat:'Business', pro:true, size:'ig-post', bg:['#f0fdf4','#22c55e'] },
+ { id:'lawyer', title:'Legal Associates', sub:'Law firm profile', cat:'Business', pro:true, size:'fb-post', bg:['#1c1917','#44403c'] },
+ { id:'hotel', title:'Hotel Stay Deal', sub:'Rooms & booking offer', cat:'Travel', pro:true, size:'fb-post', bg:['#451a03','#b45309'] },
+ { id:'property', title:'Dream Property', sub:'Plots & houses', cat:'Business', pro:false, size:'ig-post', bg:['#eff6ff','#2563eb'] },
+ { id:'pizza', title:'Pizza Night', sub:'Pizza deal post', cat:'Food', pro:false, size:'ig-post', bg:['#7f1d1d','#dc2626'] },
+ { id:'chai', title:'Dhaba Chai', sub:'Special karak chai', cat:'Food', pro:false, size:'ig-post', bg:['#fff7ed','#ea580c'] },
+ { id:'mithai', title:'Mithai Special', sub:'Sweet shop promo', cat:'Food', pro:true, size:'ig-post', bg:['#fdf2f8','#db2777'] },
+ { id:'juice', title:'Fresh Juice Bar', sub:'Juices & shakes', cat:'Food', pro:false, size:'ig-post', bg:['#fefce8','#eab308'] },
+ { id:'jewelry', title:'Gold Jewelry', sub:'Jewellery collection', cat:'Fashion', pro:true, size:'ig-post', bg:['#18181b','#b45309'] },
+ { id:'gadgets', title:'Gadget Sale', sub:'Electronics deals', cat:'Sale', pro:false, size:'ig-post', bg:['#111827','#7c3aed'] },
+ { id:'furniture', title:'Furniture Sale', sub:'Home furniture deals', cat:'Sale', pro:true, size:'fb-post', bg:['#292524','#92400e'] },
+ { id:'shoes', title:'Shoe Sale', sub:'Footwear collection', cat:'Sale', pro:false, size:'ig-post', bg:['#0c4a6e','#0284c7'] },
+ { id:'winter', title:'Winter Collection', sub:'Season fashion story', cat:'Fashion', pro:true, size:'ig-story', bg:['#164e63','#155e75'] },
+ { id:'clearance', title:'Clearance Sale', sub:'Stock clearance up to 70%', cat:'Sale', pro:false, size:'ig-post', bg:['#fef2f2','#ef4444'] },
+ { id:'aqeeqa', title:'Aqeeqa Invitation', sub:'Baby aqeeqa ceremony', cat:'Invitation', pro:false, size:'ig-post', bg:['#fdf4ff','#c026d3'] },
+ { id:'engagement', title:'Engagement', sub:'Engagement celebration', cat:'Wedding', pro:true, size:'ig-post', bg:['#fff1f2','#e11d48'] },
+ { id:'graduation', title:'Graduation Day', sub:'Class of 2026', cat:'Education', pro:false, size:'ig-post', bg:['#172554','#1d4ed8'] },
+ { id:'mehfil', title:'Mehfil Night', sub:'Naat & qawwali night', cat:'Event', pro:true, size:'ig-post', bg:['#052e16','#15803d'] },
+ { id:'muharram', title:'Muharram Majlis', sub:'Majlis-e-Aza announcement', cat:'Event', pro:false, size:'ig-post', bg:['#09090b','#3f3f46'] },
+ { id:'milad', title:'Eid Milad-un-Nabi', sub:'Milad celebration', cat:'Event', pro:false, size:'ig-post', bg:['#052e16','#16a34a'] },
+ { id:'gaming', title:'Gaming Tournament', sub:'Esports championship', cat:'Social Media', pro:true, size:'ig-post', bg:['#020617','#6d28d9'] },
+ { id:'stream', title:'Live Stream', sub:'YouTube / Facebook live', cat:'Social Media', pro:false, size:'yt-thumb', bg:['#450a0a','#dc2626'] },
+ { id:'photostudio', title:'Photography Studio', sub:'Shoots & packages', cat:'Business', pro:true, size:'fb-cover', bg:['#111827','#374151'] },
+ { id:'yoga', title:'Yoga Classes', sub:'Morning yoga batches', cat:'Fitness', pro:false, size:'ig-post', bg:['#f0fdfa','#14b8a6'] },
+ { id:'eidcard', title:'Eid Greeting Card', sub:'Eid Mubarak greeting', cat:'Eid', pro:false, size:'fb-post', bg:['#064e3b','#059669'] },
+ { id:'bookfair', title:'Book Fair', sub:'Books exhibition', cat:'Education', pro:false, size:'fb-post', bg:['#fef3c7','#d97706'] },
+ { id:'carwash', title:'Car Wash', sub:'Wash & detailing', cat:'Business', pro:false, size:'ig-post', bg:['#082f49','#0369a1'] },
+ { id:'tailor', title:'Tailor & Boutique', sub:'Stitching & designs', cat:'Fashion', pro:true, size:'ig-post', bg:['#500724','#be185d'] },
+ { id:'laptop', title:'Laptop Sale', sub:'Laptops & accessories', cat:'Sale', pro:true, size:'ig-post', bg:['#0f172a','#0ea5e9'] },
+ { id:'sports', title:'Sports Academy', sub:'Cricket & football coaching', cat:'Fitness', pro:false, size:'ig-post', bg:['#14532d','#16a34a'] },
+ { id:'newspost', title:'Breaking News', sub:'News thumbnail', cat:'Social Media', pro:true, size:'yt-thumb', bg:['#7f1d1d','#991b1b'] }
+);
+Object.assign(BUILDERS, {
+ agency(){ gradRect('#0f172a','#1e3a8a'); deco(.88,.12,.07,'#38bdf8',.5); deco(.08,.86,.05,'#38bdf8',.35);
+   pill('DIGITAL AGENCY', .3, .12, .44, '#38bdf8', '#082f49', .024);
+   addAt(T('We Grow', { fontFamily:'Poppins', fontSize: currentSize.w*.11, fill:'#ffffff', fontWeight:800, width: currentSize.w*.9 }), .5, .26);
+   addAt(T('YOUR BRAND', { fontFamily:'Poppins', fontSize: currentSize.w*.11, fill:'#38bdf8', fontWeight:800, width: currentSize.w*.9 }), .5, .38);
+   addAt(T('Social media · Ads · Websites — complete online growth for your business.', { fontFamily:'Inter', fontSize: currentSize.w*.028, fill:'#cbd5e1', width: currentSize.w*.8, lineHeight:1.5 }), .5, .56);
+   pill('BOOK A FREE CALL', .5, .74, .46, '#f59e0b', '#1c1005', .026); },
+ clinic(){ solidBg('#ecfeff'); deco(.9,.08,.08,'#06b6d4',.35); deco(.06,.9,.06,'#22d3ee',.3);
+   addAt(T('✚', { fontFamily:'Poppins', fontSize: currentSize.w*.16, fill:'#0891b2', width: currentSize.w*.3 }), .5, .12);
+   addAt(T('CITY CLINIC', { fontFamily:'Poppins', fontSize: currentSize.w*.085, fill:'#164e63', fontWeight:800, width: currentSize.w*.9 }), .5, .3);
+   addAt(T('Care you can trust — experienced doctors, honest advice.', { fontFamily:'Inter', fontSize: currentSize.w*.03, fill:'#155e75', width: currentSize.w*.8, lineHeight:1.45 }), .5, .44);
+   pill('OPD TIMING', .5, .58, .4, '#0891b2', '#ffffff', .026);
+   addAt(T('Mon – Sat · 9 AM to 9 PM', { fontFamily:'Montserrat', fontSize: currentSize.w*.028, fill:'#164e63', fontWeight:700, width: currentSize.w*.8 }), .5, .68);
+   addAt(T('Main Bazaar Road · 0300-1234567', { fontFamily:'Inter', fontSize: currentSize.w*.024, fill:'#155e75', width: currentSize.w*.84 }), .5, .8); },
+ pharmacy(){ solidBg('#f0fdf4');
+   pill('PHARMACY PLUS', .32, .1, .46, '#16a34a', '#ffffff', .024);
+   addAt(T('Your Health,', { fontFamily:'Poppins', fontSize: currentSize.w*.09, fill:'#14532d', fontWeight:800, width: currentSize.w*.9 }), .5, .24);
+   addAt(T('Delivered Fast', { fontFamily:'Poppins', fontSize: currentSize.w*.09, fill:'#16a34a', fontWeight:800, width: currentSize.w*.9 }), .5, .35);
+   addAt(T('Genuine medicines · Home delivery in the city · Open till late.', { fontFamily:'Inter', fontSize: currentSize.w*.028, fill:'#166534', width: currentSize.w*.82, lineHeight:1.5 }), .5, .52);
+   badge('FREE\nDELIVERY', .82, .6, .2, '#f59e0b', '#1c1005');
+   pill('ORDER ON WHATSAPP', .5, .78, .52, '#14532d', '#ffffff', .025); },
+ lawyer(){ gradRect('#1c1917','#44403c'); deco(.5,.06,.05,'#d4af37',.8);
+   addAt(T('⚖', { fontFamily:'Poppins', fontSize: currentSize.w*.12, fill:'#d4af37', width: currentSize.w*.3 }), .5, .14);
+   addAt(T('LEGAL', { fontFamily:'Playfair Display', fontSize: currentSize.w*.1, fill:'#fafaf9', fontWeight:700, charSpacing: 300, width: currentSize.w*.9 }), .5, .3);
+   addAt(T('ASSOCIATES', { fontFamily:'Playfair Display', fontSize: currentSize.w*.06, fill:'#d4af37', charSpacing: 420, width: currentSize.w*.9 }), .5, .41);
+   hline(.5, .5, .36, '#d4af37', Math.max(3, currentSize.w*.004));
+   addAt(T('Civil · Criminal · Family — free first consultation.', { fontFamily:'Inter', fontSize: currentSize.w*.026, fill:'#d6d3d1', width: currentSize.w*.8, lineHeight:1.5 }), .5, .6);
+   addAt(T('District Courts Road · 0321-7654321', { fontFamily:'Montserrat', fontSize: currentSize.w*.023, fill:'#a8a29e', width: currentSize.w*.84 }), .5, .76); },
+ hotel(){ return addPhoto(PH('hotel5'), 0, 0, 1, 1).then(() => { shade(0, .52, 1, .48, '#000000', .55);
+   pill('STAY DEAL', .22, .6, .3, '#f59e0b', '#1c1005', .024);
+   addAt(T('Comfort Stay Hotel', { fontFamily:'Playfair Display', fontSize: currentSize.w*.062, fill:'#ffffff', fontWeight:700, width: currentSize.w*.9 }), .5, .7);
+   addAt(T('Rooms from Rs 4,999/night — breakfast included.', { fontFamily:'Inter', fontSize: currentSize.w*.026, fill:'#fde68a', width: currentSize.w*.86 }), .5, .8);
+   addAt(T('Book now: 0300-1112233', { fontFamily:'Montserrat', fontSize: currentSize.w*.024, fill:'#ffffff', fontWeight:700, width: currentSize.w*.8 }), .5, .89); }); },
+ property(){ solidBg('#eff6ff'); deco(.92,.1,.07,'#2563eb',.3);
+   pill('DREAM PROPERTY', .36, .1, .5, '#2563eb', '#ffffff', .024);
+   addAt(T('Apna Ghar,', { fontFamily:'Poppins', fontSize: currentSize.w*.095, fill:'#1e3a8a', fontWeight:800, width: currentSize.w*.92 }), .5, .24);
+   addAt(T('Apni Zameen', { fontFamily:'Poppins', fontSize: currentSize.w*.095, fill:'#2563eb', fontWeight:800, width: currentSize.w*.92 }), .5, .35);
+   addAt(T('Plots · Houses · Shops — verified files, easy installments.', { fontFamily:'Inter', fontSize: currentSize.w*.028, fill:'#1e40af', width: currentSize.w*.82, lineHeight:1.5 }), .5, .52);
+   badge('EASY\nPLAN', .84, .58, .19, '#f59e0b', '#1c1005');
+   pill('BOOK A VISIT TODAY', .5, .78, .52, '#1e3a8a', '#ffffff', .025); },
+ pizza(){ return addPhoto(PH('pizza5'), 0, 0, 1, 1).then(() => { shade(0, .55, 1, .45, '#7f1d1d', .72);
+   addAt(T('PIZZA NIGHT', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.13, fill:'#ffffff', width: currentSize.w*.94 }), .5, .62);
+   addAt(T('Buy 1 Get 1 FREE — every Friday', { fontFamily:'Poppins', fontSize: currentSize.w*.032, fill:'#fde68a', fontWeight:700, width: currentSize.w*.9 }), .5, .74);
+   pill('ORDER: 0300-9998877', .5, .86, .5, '#facc15', '#7f1d1d', .026); }); },
+ chai(){ solidBg('#fff7ed'); deco(.08,.1,.06,'#ea580c',.4); deco(.92,.86,.07,'#f59e0b',.35);
+   addAt(T('☕', { fontFamily:'Poppins', fontSize: currentSize.w*.15, fill:'#ea580c', width: currentSize.w*.3 }), .5, .12);
+   addAt(T('DHABA CHAI', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.115, fill:'#7c2d12', width: currentSize.w*.94 }), .5, .3);
+   addAt(T('Karak · Doodh Patti · Elaichi', { fontFamily:'Poppins', fontSize: currentSize.w*.032, fill:'#c2410c', fontWeight:700, charSpacing: 60, width: currentSize.w*.9 }), .5, .43);
+   addAt(T('Thand mein garam chai — dost, gap shap aur sukoon.', { fontFamily:'Inter', fontSize: currentSize.w*.028, fill:'#9a3412', width: currentSize.w*.82, lineHeight:1.5 }), .5, .58);
+   pill('OPEN TILL 2 AM', .5, .74, .42, '#ea580c', '#ffffff', .026); },
+ mithai(){ solidBg('#fdf2f8'); deco(.1,.12,.06,'#db2777',.35); deco(.9,.12,.06,'#f59e0b',.4); deco(.5,.92,.05,'#db2777',.25);
+   pill('MITHAI SPECIAL', .5, .12, .44, '#db2777', '#ffffff', .024);
+   addAt(T('Fresh Mithai', { fontFamily:'Playfair Display', fontSize: currentSize.w*.1, fill:'#831843', fontWeight:700, width: currentSize.w*.92 }), .5, .27);
+   addAt(T('Barfi · Gulab Jamun · Jalebi', { fontFamily:'Poppins', fontSize: currentSize.w*.03, fill:'#be185d', fontWeight:700, width: currentSize.w*.9 }), .5, .4);
+   addAt(T('Wedding & events ke liye bulk orders — pure desi ghee.', { fontFamily:'Inter', fontSize: currentSize.w*.027, fill:'#9d174d', width: currentSize.w*.8, lineHeight:1.5 }), .5, .55);
+   pill('ORDER: 0333-4455667', .5, .72, .48, '#831843', '#ffffff', .025); },
+ juice(){ return addPhoto(PH('juice5'), 0, 0, 1, 1).then(() => { shade(0, 0, 1, .44, '#fefce8', .88);
+   addAt(T('FRESH JUICE BAR', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.105, fill:'#854d0e', width: currentSize.w*.94 }), .5, .1);
+   addAt(T('Orange · Mango · Mint Margarita', { fontFamily:'Poppins', fontSize: currentSize.w*.028, fill:'#a16207', fontWeight:700, width: currentSize.w*.9 }), .5, .22);
+   pill('SHAKES FROM RS 250', .5, .33, .5, '#eab308', '#713f12', .024); }); },
+ jewelry(){ gradRect('#18181b','#27272a'); deco(.12,.14,.05,'#d4af37',.8); deco(.88,.14,.05,'#d4af37',.8); deco(.5,.9,.04,'#d4af37',.6);
+   addAt(T('✦ GOLD ✦', { fontFamily:'Montserrat', fontSize: currentSize.w*.026, fill:'#d4af37', fontWeight:700, charSpacing: 300, width: currentSize.w*.8 }), .5, .13);
+   addAt(T('Timeless', { fontFamily:'Playfair Display', fontSize: currentSize.w*.11, fill:'#fafafa', fontWeight:700, width: currentSize.w*.92 }), .5, .28);
+   addAt(T('JEWELRY', { fontFamily:'Playfair Display', fontSize: currentSize.w*.11, fill:'#d4af37', fontWeight:700, charSpacing: 200, width: currentSize.w*.92 }), .5, .4);
+   addAt(T('Bridal sets · Bangles · Rings — certified pure gold.', { fontFamily:'Inter', fontSize: currentSize.w*.027, fill:'#d4d4d8', width: currentSize.w*.8, lineHeight:1.5 }), .5, .58);
+   pill('VISIT OUR SHOWROOM', .5, .74, .5, '#d4af37', '#18181b', .024); },
+ gadgets(){ gradRect('#111827','#312e81'); deco(.9,.1,.09,'#8b5cf6',.5); deco(.06,.88,.06,'#22d3ee',.4);
+   pill('GADGET SALE', .28, .11, .4, '#22d3ee', '#082f49', .024);
+   addAt(T('SMART', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.14, fill:'#ffffff', width: currentSize.w*.94 }), .5, .25);
+   addAt(T('GADGETS', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.14, fill:'#a78bfa', width: currentSize.w*.94 }), .5, .39);
+   addAt(T('Earbuds · Smart watches · Speakers — up to 40% off.', { fontFamily:'Inter', fontSize: currentSize.w*.028, fill:'#c7d2fe', width: currentSize.w*.82, lineHeight:1.5 }), .5, .57);
+   badge('40%\nOFF', .85, .62, .19, '#f43f5e', '#ffffff');
+   pill('SHOP NOW', .42, .76, .36, '#7c3aed', '#ffffff', .027); },
+ furniture(){ gradRect('#292524','#78350f');
+   pill('FURNITURE SALE', .36, .11, .5, '#f59e0b', '#292524', .024);
+   addAt(T('Ghar Ko Nayi', { fontFamily:'Poppins', fontSize: currentSize.w*.095, fill:'#fafaf9', fontWeight:800, width: currentSize.w*.92 }), .5, .25);
+   addAt(T('Pehchan Dein', { fontFamily:'Poppins', fontSize: currentSize.w*.095, fill:'#fbbf24', fontWeight:800, width: currentSize.w*.92 }), .5, .36);
+   addAt(T('Sofas · Beds · Dining sets — solid sheesham wood, 5-year warranty.', { fontFamily:'Inter', fontSize: currentSize.w*.027, fill:'#e7e5e4', width: currentSize.w*.82, lineHeight:1.5 }), .5, .54);
+   pill('FREE HOME DELIVERY', .5, .72, .52, '#fafaf9', '#292524', .024); },
+ shoes(){ gradRect('#0c4a6e','#0369a1'); deco(.9,.84,.08,'#38bdf8',.4);
+   addAt(T('STEP UP', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.135, fill:'#ffffff', width: currentSize.w*.94 }), .5, .16);
+   addAt(T('Shoe Sale — New Arrivals', { fontFamily:'Poppins', fontSize: currentSize.w*.032, fill:'#bae6fd', fontWeight:700, width: currentSize.w*.9 }), .5, .3);
+   addAt(T('Sneakers · Sports · Formal — har style, har size.', { fontFamily:'Inter', fontSize: currentSize.w*.028, fill:'#e0f2fe', width: currentSize.w*.82, lineHeight:1.5 }), .5, .45);
+   badge('30%\nOFF', .84, .52, .2, '#facc15', '#0c4a6e');
+   pill('FROM RS 1,999', .42, .68, .4, '#ffffff', '#0c4a6e', .026);
+   addAt(T('Main Road Branch · 10 AM – 10 PM', { fontFamily:'Montserrat', fontSize: currentSize.w*.023, fill:'#bae6fd', width: currentSize.w*.84 }), .5, .84); },
+ winter(){ gradRect('#164e63','#0e7490'); deco(.14,.1,.05,'#e0f2fe',.8); deco(.84,.16,.04,'#e0f2fe',.7); deco(.7,.06,.03,'#e0f2fe',.8);
+   pill('NEW SEASON', .3, .09, .4, '#e0f2fe', '#164e63', .024);
+   addAt(T('WINTER', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.15, fill:'#ffffff', width: currentSize.w*.94 }), .5, .24);
+   addAt(T('COLLECTION', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.15, fill:'#a5f3fc', width: currentSize.w*.94 }), .5, .38);
+   addAt(T('Jackets · Shawls · Sweaters', { fontFamily:'Poppins', fontSize: currentSize.w*.03, fill:'#cffafe', fontWeight:700, width: currentSize.w*.9 }), .5, .52);
+   pill('SHOP THE LOOK', .5, .68, .42, '#ffffff', '#164e63', .025); },
+ clearance(){ solidBg('#fef2f2');
+   addAt(T('CLEARANCE', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.15, fill:'#dc2626', width: currentSize.w*.96 }), .5, .13);
+   addAt(T('SALE', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.15, fill:'#111827', width: currentSize.w*.96 }), .5, .27);
+   badge('UP TO\n70% OFF', .5, .47, .3, '#dc2626', '#ffffff');
+   addAt(T('Stock khatam honay tak — pehle ayen, pehle payen!', { fontFamily:'Poppins', fontSize: currentSize.w*.028, fill:'#374151', fontWeight:700, width: currentSize.w*.86 }), .5, .66);
+   pill('GRAB THE DEAL', .5, .79, .44, '#111827', '#ffffff', .026); },
+ aqeeqa(){ solidBg('#fdf4ff'); deco(.1,.1,.06,'#e879f9',.5); deco(.9,.14,.05,'#f59e0b',.5); deco(.86,.86,.06,'#e879f9',.4);
+   addAt(T('بسم اللہ الرحمن الرحیم', { fontFamily:'Noto Nastaliq Urdu', fontSize: currentSize.w*.038, fill:'#a21caf', width: currentSize.w*.9, lineHeight: 1.9 }), .5, .08);
+   addAt(T('AQEEQA', { fontFamily:'Playfair Display', fontSize: currentSize.w*.115, fill:'#701a75', fontWeight:700, charSpacing: 200, width: currentSize.w*.94 }), .5, .27);
+   addAt(T('CEREMONY', { fontFamily:'Montserrat', fontSize: currentSize.w*.032, fill:'#a21caf', fontWeight:700, charSpacing: 400, width: currentSize.w*.9 }), .5, .38);
+   addAt(T('of our beloved son', { fontFamily:'Playfair Display', fontSize: currentSize.w*.032, fill:'#86198f', width: currentSize.w*.8 }), .5, .5);
+   addAt(T('Muhammad Ahmed', { fontFamily:'Dancing Script', fontSize: currentSize.w*.07, fill:'#701a75', width: currentSize.w*.9 }), .5, .58);
+   pill('SUNDAY · 1 PM · HOME SWEET HOME', .5, .72, .62, '#a21caf', '#ffffff', .022); },
+ engagement(){ gradRect('#fff1f2','#ffe4e6'); deco(.12,.12,.05,'#e11d48',.5); deco(.88,.12,.05,'#f59e0b',.5);
+   addAt(T('💍', { fontFamily:'Poppins', fontSize: currentSize.w*.11, fill:'#e11d48', width: currentSize.w*.3 }), .5, .1);
+   addAt(T('Engagement', { fontFamily:'Dancing Script', fontSize: currentSize.w*.115, fill:'#881337', width: currentSize.w*.94 }), .5, .26);
+   addAt(T('Ayesha & Daniyal', { fontFamily:'Playfair Display', fontSize: currentSize.w*.055, fill:'#9f1239', fontWeight:700, width: currentSize.w*.92 }), .5, .4);
+   hline(.5, .5, .3, '#e11d48', Math.max(3, currentSize.w*.003));
+   addAt(T('Two hearts, one beautiful beginning.', { fontFamily:'Inter', fontSize: currentSize.w*.028, fill:'#881337', width: currentSize.w*.82, lineHeight:1.5 }), .5, .58);
+   pill('SAT · 14 FEB · ROSE MARQUEE', .5, .72, .58, '#9f1239', '#ffffff', .022); },
+ graduation(){ gradRect('#172554','#1e40af'); deco(.88,.1,.06,'#facc15',.7); deco(.08,.88,.05,'#60a5fa',.5);
+   addAt(T('🎓', { fontFamily:'Poppins', fontSize: currentSize.w*.13, fill:'#facc15', width: currentSize.w*.3 }), .5, .11);
+   addAt(T('GRADUATION', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.125, fill:'#ffffff', width: currentSize.w*.96 }), .5, .28);
+   addAt(T('Class of 2026', { fontFamily:'Dancing Script', fontSize: currentSize.w*.075, fill:'#facc15', width: currentSize.w*.9 }), .5, .4);
+   addAt(T('The future belongs to those who believe in their dreams.', { fontFamily:'Inter', fontSize: currentSize.w*.027, fill:'#bfdbfe', width: currentSize.w*.8, lineHeight:1.5 }), .5, .56);
+   pill('CONGRATS, GRADUATES!', .5, .72, .5, '#facc15', '#172554', .024); },
+ mehfil(){ gradRect('#052e16','#14532d'); crescent(.5, .13, .05, '#facc15', '#052e16'); starShape(.63, .1, .014, '#facc15'); deco(.12,.86,.05,'#22c55e',.4); deco(.88,.86,.05,'#22c55e',.4);
+   addAt(T('محفلِ نعت', { fontFamily:'Noto Nastaliq Urdu', fontSize: currentSize.w*.085, fill:'#facc15', width: currentSize.w*.9, lineHeight: 1.9 }), .5, .3);
+   addAt(T('MEHFIL NIGHT', { fontFamily:'Montserrat', fontSize: currentSize.w*.03, fill:'#bbf7d0', fontWeight:700, charSpacing: 300, width: currentSize.w*.9 }), .5, .47);
+   addAt(T('Naat khwani & qawwali — tamam ahbab ko dawat-e-aam hai.', { fontFamily:'Inter', fontSize: currentSize.w*.027, fill:'#dcfce7', width: currentSize.w*.82, lineHeight:1.5 }), .5, .6);
+   pill('FRIDAY · AFTER ISHA · JAMIA MASJID', .5, .74, .64, '#facc15', '#052e16', .021); },
+ muharram(){ solidBg('#09090b'); deco(.5,.07,.04,'#dc2626',.9);
+   addAt(T('مجلسِ عزا', { fontFamily:'Noto Nastaliq Urdu', fontSize: currentSize.w*.09, fill:'#fafafa', width: currentSize.w*.9, lineHeight: 1.9 }), .5, .22);
+   addAt(T('MUHARRAM-UL-HARAM', { fontFamily:'Montserrat', fontSize: currentSize.w*.028, fill:'#a1a1aa', fontWeight:700, charSpacing: 300, width: currentSize.w*.9 }), .5, .42);
+   hline(.5, .5, .3, '#dc2626', Math.max(3, currentSize.w*.003));
+   addAt(T('Majlis-e-Aza basilsila-e-shahadat Imam Hussain (A.S)', { fontFamily:'Inter', fontSize: currentSize.w*.027, fill:'#d4d4d8', width: currentSize.w*.84, lineHeight:1.55 }), .5, .6);
+   pill('9 PM · IMAM BARGAH', .5, .74, .44, '#27272a', '#fafafa', .023); },
+ milad(){ gradRect('#052e16','#16a34a'); crescent(.5, .12, .05, '#facc15', '#052e16'); starShape(.63, .09, currentSize.w*.014, '#facc15'); deco(.1,.85,.05,'#4ade80',.5); deco(.9,.85,.05,'#4ade80',.5);
+   addAt(T('عید میلاد النبی ﷺ', { fontFamily:'Noto Nastaliq Urdu', fontSize: currentSize.w*.075, fill:'#facc15', width: currentSize.w*.92, lineHeight: 1.9 }), .5, .28);
+   addAt(T('Jashn-e-Eid Milad-un-Nabi', { fontFamily:'Poppins', fontSize: currentSize.w*.036, fill:'#ffffff', fontWeight:700, width: currentSize.w*.9 }), .5, .45);
+   addAt(T('Tamam aashiqan-e-Rasool ﷺ ko dili mubarakbad.', { fontFamily:'Inter', fontSize: currentSize.w*.027, fill:'#dcfce7', width: currentSize.w*.82, lineHeight:1.5 }), .5, .58);
+   pill('12 RABI-UL-AWWAL', .5, .72, .44, '#facc15', '#052e16', .023); },
+ gaming(){ gradRect('#020617','#4c1d95'); deco(.9,.12,.08,'#a855f7',.5); deco(.07,.85,.06,'#22d3ee',.45);
+   pill('ESPORTS CHAMPIONSHIP', .5, .11, .52, '#a855f7', '#ffffff', .023);
+   addAt(T('GAMING', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.15, fill:'#ffffff', width: currentSize.w*.96 }), .5, .26);
+   addAt(T('TOURNAMENT', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.15, fill:'#22d3ee', width: currentSize.w*.96 }), .5, .4);
+   addAt(T('Prize pool Rs 100,000 · Solo & squad matches · Live finals.', { fontFamily:'Inter', fontSize: currentSize.w*.027, fill:'#ddd6fe', width: currentSize.w*.82, lineHeight:1.5 }), .5, .58);
+   pill('REGISTER YOUR TEAM', .5, .74, .48, '#dc2626', '#ffffff', .025); },
+ stream(){ gradRect('#450a0a','#7f1d1d'); shade(.06, .3, .88, .14, '#dc2626', 1);
+   addAt(T('● LIVE', { fontFamily:'Poppins', fontSize: currentSize.w*.045, fill:'#ffffff', fontWeight:800, width: currentSize.w*.5 }), .5, .33);
+   addAt(T('LIVE STREAM', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.13, fill:'#ffffff', width: currentSize.w*.96 }), .5, .55);
+   addAt(T('Tonight 8 PM — YouTube & Facebook par live ayen, sawalon ke jawab payen.', { fontFamily:'Inter', fontSize: currentSize.w*.028, fill:'#fecaca', width: currentSize.w*.84, lineHeight:1.5 }), .5, .7);
+   pill('SET REMINDER 🔔', .5, .84, .42, '#ffffff', '#7f1d1d', .024); },
+ photostudio(){ return addPhoto(PH('camera5'), 0, 0, 1, 1).then(() => { shade(0, 0, .52, 1, '#000000', .55);
+   addAt(T('CAPTURE', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.06, fill:'#ffffff', width: currentSize.w*.48 }), .27, .3);
+   addAt(T('STUDIO', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.06, fill:'#facc15', width: currentSize.w*.48 }), .27, .38);
+   addAt(T('Weddings · Portraits · Products', { fontFamily:'Inter', fontSize: currentSize.w*.016, fill:'#e5e7eb', width: currentSize.w*.44, lineHeight:1.5 }), .27, .48);
+   addAt(T('Book: 0300-1212121', { fontFamily:'Montserrat', fontSize: currentSize.w*.015, fill:'#ffffff', fontWeight:700, width: currentSize.w*.44 }), .27, .58); }); },
+ yoga(){ solidBg('#f0fdfa'); deco(.9,.1,.07,'#14b8a6',.3); deco(.07,.88,.06,'#5eead4',.35);
+   addAt(T('🧘', { fontFamily:'Poppins', fontSize: currentSize.w*.13, fill:'#0d9488', width: currentSize.w*.3 }), .5, .11);
+   addAt(T('YOGA CLASSES', { fontFamily:'Poppins', fontSize: currentSize.w*.08, fill:'#134e4a', fontWeight:800, width: currentSize.w*.92 }), .5, .28);
+   addAt(T('Subah ki taazgi, sehat aur sukoon — pehla haffa bilkul free.', { fontFamily:'Inter', fontSize: currentSize.w*.028, fill:'#115e59', width: currentSize.w*.82, lineHeight:1.5 }), .5, .43);
+   pill('6 AM BATCH · LADIES & GENTS', .5, .58, .56, '#0d9488', '#ffffff', .022);
+   addAt(T('City Park Gate 2 · 0345-9090909', { fontFamily:'Montserrat', fontSize: currentSize.w*.023, fill:'#115e59', width: currentSize.w*.84 }), .5, .72); },
+ eidcard(){ gradRect('#064e3b','#047857'); crescent(.5, .14, .055, '#facc15', '#064e3b'); starShape(.64, .1, .015, '#facc15'); deco(.08,.85,.05,'#34d399',.45); deco(.92,.85,.05,'#34d399',.45);
+   addAt(T('Eid Mubarak', { fontFamily:'Dancing Script', fontSize: currentSize.w*.11, fill:'#facc15', width: currentSize.w*.94 }), .5, .34);
+   addAt(T('May your life be filled with joy, health and barakah.', { fontFamily:'Inter', fontSize: currentSize.w*.026, fill:'#d1fae5', width: currentSize.w*.84, lineHeight:1.5 }), .5, .52);
+   addAt(T('— From the Ahmed Family', { fontFamily:'Playfair Display', fontSize: currentSize.w*.028, fill:'#ffffff', width: currentSize.w*.8 }), .5, .66); },
+ bookfair(){ solidBg('#fffbeb'); deco(.08,.1,.06,'#d97706',.35); deco(.92,.88,.06,'#f59e0b',.3);
+   addAt(T('📚', { fontFamily:'Poppins', fontSize: currentSize.w*.12, fill:'#d97706', width: currentSize.w*.3 }), .5, .11);
+   addAt(T('BOOK FAIR', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.13, fill:'#78350f', width: currentSize.w*.96 }), .5, .28);
+   addAt(T('3 Days · 5000+ Titles', { fontFamily:'Poppins', fontSize: currentSize.w*.032, fill:'#b45309', fontWeight:700, width: currentSize.w*.9 }), .5, .4);
+   addAt(T('Novels · Course books · Children stories — up to 50% off.', { fontFamily:'Inter', fontSize: currentSize.w*.027, fill:'#92400e', width: currentSize.w*.82, lineHeight:1.5 }), .5, .55);
+   pill('CITY LIBRARY HALL', .5, .7, .46, '#d97706', '#ffffff', .024); },
+ carwash(){ gradRect('#082f49','#075985'); deco(.12,.12,.06,'#38bdf8',.5); deco(.86,.2,.04,'#7dd3fc',.6); deco(.9,.78,.07,'#38bdf8',.35);
+   pill('CAR WASH & DETAILING', .5, .11, .54, '#38bdf8', '#082f49', .023);
+   addAt(T('Shine', { fontFamily:'Poppins', fontSize: currentSize.w*.115, fill:'#ffffff', fontWeight:800, width: currentSize.w*.92 }), .5, .26);
+   addAt(T('Like New', { fontFamily:'Poppins', fontSize: currentSize.w*.115, fill:'#7dd3fc', fontWeight:800, width: currentSize.w*.92 }), .5, .38);
+   addAt(T('Foam wash · Interior polish · Ceramic coating packages.', { fontFamily:'Inter', fontSize: currentSize.w*.027, fill:'#e0f2fe', width: currentSize.w*.82, lineHeight:1.5 }), .5, .56);
+   pill('PACKAGES FROM RS 999', .5, .72, .5, '#facc15', '#082f49', .024); },
+ tailor(){ gradRect('#500724','#831843'); deco(.9,.12,.06,'#f9a8d4',.45); deco(.08,.86,.05,'#f59e0b',.4);
+   addAt(T('✂', { fontFamily:'Poppins', fontSize: currentSize.w*.11, fill:'#f9a8d4', width: currentSize.w*.3 }), .5, .11);
+   addAt(T('TAILOR &', { fontFamily:'Playfair Display', fontSize: currentSize.w*.095, fill:'#fdf2f8', fontWeight:700, width: currentSize.w*.92 }), .5, .26);
+   addAt(T('BOUTIQUE', { fontFamily:'Playfair Display', fontSize: currentSize.w*.095, fill:'#f9a8d4', fontWeight:700, charSpacing: 200, width: currentSize.w*.92 }), .5, .37);
+   addAt(T('Bridal · Party wear · Daily stitched suits — perfect fitting guarantee.', { fontFamily:'Inter', fontSize: currentSize.w*.026, fill:'#fce7f3', width: currentSize.w*.82, lineHeight:1.5 }), .5, .55);
+   pill('ORDER: 0322-3344556', .5, .71, .46, '#fdf2f8', '#831843', .024); },
+ laptop(){ gradRect('#0f172a','#0c4a6e'); deco(.9,.88,.08,'#38bdf8',.35); deco(.07,.1,.05,'#818cf8',.45);
+   pill('LAPTOP SALE', .28, .11, .4, '#38bdf8', '#082f49', .024);
+   addAt(T('POWER', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.14, fill:'#ffffff', width: currentSize.w*.94 }), .5, .25);
+   addAt(T('UPGRADE', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.14, fill:'#38bdf8', width: currentSize.w*.94 }), .5, .39);
+   addAt(T('Core i5 / i7 · SSD · 1-year warranty — students ke liye khaas discount.', { fontFamily:'Inter', fontSize: currentSize.w*.027, fill:'#bae6fd', width: currentSize.w*.82, lineHeight:1.5 }), .5, .57);
+   badge('STUDENT\nDEAL', .85, .62, .19, '#f59e0b', '#1c1005');
+   pill('FROM RS 45,000', .42, .76, .42, '#ffffff', '#0f172a', .025); },
+ sports(){ gradRect('#14532d','#166534'); deco(.9,.1,.07,'#4ade80',.45); deco(.07,.88,.06,'#facc15',.35);
+   addAt(T('🏏', { fontFamily:'Poppins', fontSize: currentSize.w*.12, fill:'#ffffff', width: currentSize.w*.3 }), .5, .11);
+   addAt(T('SPORTS ACADEMY', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.105, fill:'#ffffff', width: currentSize.w*.96 }), .5, .28);
+   addAt(T('Cricket · Football · Fitness', { fontFamily:'Poppins', fontSize: currentSize.w*.03, fill:'#bbf7d0', fontWeight:700, width: currentSize.w*.9 }), .5, .4);
+   addAt(T('Expert coaches · Morning & evening batches · Ages 6–18.', { fontFamily:'Inter', fontSize: currentSize.w*.027, fill:'#dcfce7', width: currentSize.w*.82, lineHeight:1.5 }), .5, .54);
+   pill('FREE TRIAL CLASS', .5, .7, .46, '#facc15', '#14532d', .025); },
+ newspost(){ gradRect('#7f1d1d','#450a0a'); shade(0, .62, 1, .38, '#000000', .45);
+   pill('BREAKING', .2, .1, .3, '#dc2626', '#ffffff', .028);
+   addAt(T('BIG NEWS HEADLINE', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.085, fill:'#ffffff', width: currentSize.w*.92 }), .5, .7);
+   addAt(T('Watch the full story on our channel — details in description.', { fontFamily:'Inter', fontSize: currentSize.w*.024, fill:'#fecaca', width: currentSize.w*.88 }), .5, .82);
+   addAt(T('NEWS 24/7', { fontFamily:'Montserrat', fontSize: currentSize.w*.022, fill:'#fca5a5', fontWeight:700, charSpacing: 200, width: currentSize.w*.6 }), .5, .14); }
+});
+
