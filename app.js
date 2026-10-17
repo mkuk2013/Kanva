@@ -117,11 +117,11 @@ async function afterAuth(user, silent){
 function rowToDesign(r){
   const d = r.data || {};
   return { id: r.id, name: r.name, sizeId: r.size_id, sizeName: r.size_name, sizeW: r.size_w, sizeH: r.size_h,
-           json: d.json, bg: d.bg, thumb: d.thumb, trashed: !!r.trashed,
+           json: d.json, bg: d.bg, thumb: d.thumb, pages: d.pages || null, folder: d.folder || '', trashed: !!r.trashed,
            updated: r.updated_at ? new Date(r.updated_at).toLocaleString() : '' };
 }
 function fingerprintOf(d){
-  return [d.name, d.trashed ? 1 : 0, (d.json || '').length, (d.thumb || '').length, d.bg || '', d.sizeW || 0, d.sizeH || 0, d.sizeId || ''].join('|');
+  return [d.name, d.trashed ? 1 : 0, (d.json || '').length, (d.thumb || '').length, d.bg || '', d.sizeW || 0, d.sizeH || 0, d.sizeId || '', (d.pages || []).reduce((a, p) => a + (p.json || '').length, 0), d.folder || ''].join('|');
 }
 async function loadCloudData(){
   try {
@@ -152,7 +152,7 @@ async function migrateLocalDesigns(){
     const local = JSON.parse(localStorage.getItem(key) || '[]');
     if (!local.length || localStorage.getItem('kv_migrated3_' + currentUser.email)) return;
     const rows = local.map(d => ({ id: d.id, user_id: cloudUser.id, name: d.name, size_id: d.sizeId, size_name: d.sizeName,
-      size_w: d.sizeW, size_h: d.sizeH, data: { json: d.json, bg: d.bg, thumb: d.thumb }, trashed: !!d.trashed }));
+      size_w: d.sizeW, size_h: d.sizeH, data: { json: d.json, bg: d.bg, thumb: d.thumb, pages: d.pages || null, folder: d.folder || '' }, trashed: !!d.trashed }));
     const { error } = await sb.from('designs').insert(rows);
     if (!error){
       designsCache = local.slice();
@@ -392,13 +392,30 @@ function onSearch(v){
 }
 
 /* ---------------- PROJECTS / TRASH ---------------- */
+let projectFolder = 'All';
+function setProjectFolder(f){ projectFolder = f; renderProjects(); }
+function moveToFolder(id){
+  const ds = getDesigns(); const d = ds.find(x => x.id === id); if (!d) return;
+  const f = prompt('Folder ka naam likhein (khaali rakhein = folder se bahar):', d.folder || '');
+  if (f === null) return;
+  d.folder = f.trim(); saveDesigns(ds); renderProjects(); renderDashboard();
+  toast(d.folder ? '📁 "' + d.folder + '" folder mein chala gaya' : '📁 Folder se bahar nikaal diya');
+}
 function renderProjects(){
   const g = document.getElementById('projectGrid'); if (!g) return;
-  const designs = getDesigns().filter(d => !d.trashed);
+  const allDesigns = getDesigns().filter(d => !d.trashed);
+  const chips = document.getElementById('folderChips');
+  if (chips){
+    const folders = [...new Set(allDesigns.map(d => d.folder).filter(Boolean))];
+    if (projectFolder !== 'All' && !folders.includes(projectFolder)) projectFolder = 'All';
+    chips.innerHTML = ['All', ...folders].map(f => `<button class="cat-chip ${projectFolder === f ? 'active' : ''}" onclick="setProjectFolder('${f.replace(/'/g, '')}')">${f === 'All' ? '📁 All projects' : '📁 ' + escapeHtml(f)}</button>`).join('');
+  }
+  const designs = projectFolder === 'All' ? allDesigns : allDesigns.filter(d => (d.folder || '') === projectFolder);
   g.innerHTML = designs.length ? designs.map(d =>
     `<div class="design-card"><img src="${d.thumb}" alt=""><div class="dc-body">
       <div class="dc-name">${escapeHtml(d.name)}</div><div class="dc-date">${d.sizeName || ''} · ${d.updated}</div>
       <div class="dc-btns"><button onclick="loadDesign(${d.id})">Open</button>
+      <button onclick="moveToFolder(${d.id})">Folder</button>
       <button onclick="renameDesign(${d.id})">Rename</button>
       <button onclick="duplicateDesign(${d.id})">Duplicate</button>
       <button class="danger" onclick="trashDesign(${d.id})">Trash</button></div></div></div>`).join('')
@@ -498,6 +515,7 @@ function openEditor(sizeId, tplId){
   document.getElementById('view-editor').style.display = '';
   if (!editorCanvas) initCanvas(); else if (canvas !== editorCanvas) canvas = editorCanvas;
   if (sizeId) setSize(sizeId);
+  resetPages(null, 0);
   if (tplId) applyTemplate(tplId);
   const sp = document.querySelector('.sidepanel');
   if (sp && window.innerWidth <= 900) sp.classList.remove('open');
@@ -647,8 +665,101 @@ function addFrame(kind){
   }
   if (o) center(o);
 }
+/* ---- Tables ---- */
+function addTable(){
+  const rows = Math.min(10, Math.max(1, parseInt(document.getElementById('tblRows').value) || 3));
+  const cols = Math.min(6, Math.max(1, parseInt(document.getElementById('tblCols').value) || 3));
+  const style = document.getElementById('tblStyle').value;
+  const W = currentSize.w * .84, cellW = W / cols, cellH = Math.max(46, cellW * .34);
+  const items = [];
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++){
+    const head = r === 0 && style === 'purple';
+    const fill = head ? '#8b3dff' : (r % 2 ? '#f4f1fa' : '#ffffff');
+    items.push(new fabric.Rect({ left: c * cellW, top: r * cellH, width: cellW, height: cellH, fill, stroke: '#d9d2e8', strokeWidth: 2, name: 'Table' }));
+    items.push(new fabric.Textbox(head ? 'Title' : 'Text', { left: c * cellW + 10, top: r * cellH + cellH / 2 - 13, width: cellW - 20, fontSize: Math.round(cellH * .34), fontFamily: 'Poppins', fontWeight: head ? 700 : 400, fill: head ? '#ffffff' : '#23272f', textAlign: 'center', name: 'Table' }));
+  }
+  const g = new fabric.Group(items, { name: 'Table' });
+  center(g);
+  toast('🔲 Table lag gayi — cells edit karne ke liye pehle Ungroup karein');
+}
+/* ---- Charts (apne data se) ---- */
+const CHART_COLORS = ['#8b3dff','#00c4cc','#ec4899','#f5a623','#22c55e','#3b82f6','#ef4444','#14b8a6'];
+function parseChartData(){
+  const raw = (document.getElementById('chartData').value || '').split('\n').map(x => x.trim()).filter(Boolean);
+  const out = [];
+  raw.forEach(line => { const parts = line.split(','); const v = parseFloat(parts[parts.length - 1]); if (!isNaN(v)) out.push({ label: parts.slice(0, -1).join(',') || 'Item', value: v }); });
+  return out.slice(0, 8);
+}
+function addChart(){
+  const data = parseChartData();
+  if (data.length < 2){ toast('⚠️ Kam az kam 2 lines likhein — jaise: Apple, 40'); return; }
+  const type = document.getElementById('chartType').value;
+  const W = currentSize.w * .62, H = currentSize.h * .42, max = Math.max(...data.map(d => d.value)) || 1;
+  const items = [];
+  if (type === 'bar'){
+    const bw = W / (data.length * 1.6), gap = (W - bw * data.length) / (data.length + 1);
+    data.forEach((d, i) => {
+      const h = (d.value / max) * (H - 60), x = gap + i * (bw + gap);
+      items.push(new fabric.Rect({ left: x, top: H - 40 - h, width: bw, height: h, fill: CHART_COLORS[i % 8], name: 'Chart' }));
+      items.push(new fabric.Textbox(String(d.value), { left: x - 6, top: H - 64 - h, width: bw + 12, fontSize: 26, fontFamily: 'Poppins', fontWeight: 700, fill: '#23272f', textAlign: 'center', name: 'Chart' }));
+      items.push(new fabric.Textbox(d.label, { left: x - 10, top: H - 32, width: bw + 20, fontSize: 22, fontFamily: 'Inter', fill: '#555c66', textAlign: 'center', name: 'Chart' }));
+    });
+    items.push(new fabric.Rect({ left: 0, top: H - 40, width: W, height: 4, fill: '#0d1216', name: 'Chart' }));
+  } else if (type === 'pie' || type === 'donut'){
+    const total = data.reduce((a, d) => a + d.value, 0) || 1, R = Math.min(W, H) / 2;
+    let a0 = 0;
+    data.forEach((d, i) => {
+      const sweep = (d.value / total) * 360;
+      items.push(new fabric.Circle({ radius: R, left: 0, top: 0, startAngle: a0, endAngle: a0 + sweep, fill: CHART_COLORS[i % 8], name: 'Chart' }));
+      a0 += sweep;
+    });
+    if (type === 'donut') items.push(new fabric.Circle({ radius: R * .55, left: R * .45, top: R * .45, fill: '#ffffff', name: 'Chart' }));
+    data.forEach((d, i) => {
+      items.push(new fabric.Rect({ left: R * 2 + 30, top: i * 46, width: 26, height: 26, fill: CHART_COLORS[i % 8], name: 'Chart' }));
+      items.push(new fabric.Textbox(d.label + ' — ' + d.value, { left: R * 2 + 68, top: i * 46 - 2, width: 280, fontSize: 25, fontFamily: 'Inter', fill: '#23272f', name: 'Chart' }));
+    });
+  } else {
+    const stepX = W / Math.max(data.length - 1, 1);
+    const pts = data.map((d, i) => ({ x: i * stepX, y: (H - 50) - (d.value / max) * (H - 110) }));
+    items.push(new fabric.Polyline(pts, { fill: '', stroke: '#8b3dff', strokeWidth: 6, name: 'Chart' }));
+    pts.forEach((p, i) => {
+      items.push(new fabric.Circle({ radius: 11, left: p.x - 11, top: p.y - 11, fill: '#8b3dff', name: 'Chart' }));
+      items.push(new fabric.Textbox(data[i].label, { left: p.x - 45, top: H - 36, width: 90, fontSize: 22, fontFamily: 'Inter', fill: '#555c66', textAlign: 'center', name: 'Chart' }));
+    });
+    items.push(new fabric.Rect({ left: 0, top: H - 42, width: W, height: 4, fill: '#0d1216', name: 'Chart' }));
+  }
+  const g = new fabric.Group(items, { name: 'Chart' });
+  center(g);
+  toast('📊 Chart ban gaya — apne data ke sath');
+}
+/* ---- Collage frames ---- */
+function addCollage(n){
+  const W = currentSize.w, H = currentSize.h, m = W * .04, gap = W * .02;
+  const iw = W - 2 * m, ih = H - 2 * m, boxes = [];
+  if (n === 2){ boxes.push([m, m, (iw - gap) / 2, ih]); boxes.push([m + (iw - gap) / 2 + gap, m, (iw - gap) / 2, ih]); }
+  else if (n === 3){ boxes.push([m, m, iw, (ih - gap) / 2]); boxes.push([m, m + (ih - gap) / 2 + gap, (iw - gap) / 2, (ih - gap) / 2]); boxes.push([m + (iw - gap) / 2 + gap, m + (ih - gap) / 2 + gap, (iw - gap) / 2, (ih - gap) / 2]); }
+  else { const cw = (iw - gap) / 2, ch = (ih - gap) / 2; boxes.push([m, m, cw, ch]); boxes.push([m + cw + gap, m, cw, ch]); boxes.push([m, m + ch + gap, cw, ch]); boxes.push([m + cw + gap, m + ch + gap, cw, ch]); }
+  boxes.forEach(b => canvas.add(new fabric.Rect({ left: b[0], top: b[1], width: b[2], height: b[3], fill: '#e8e4f2', stroke: '#8b3dff', strokeWidth: 3, strokeDashArray: [10, 7], name: 'Photo Frame' })));
+  canvas.renderAll(); pushHistory(); markUnsaved();
+  toast('🖼️ Frames lag gaye — ek frame select karein, phir Photos/Uploads se photo chunein, wo frame mein fit ho jayegi');
+}
+function fillFrame(frame, url){
+  fabric.Image.fromURL(url, img => {
+    if (!img || !img.width){ toast('⚠️ Photo load nahi hui — internet check karein'); return; }
+    const fb = frame.getBoundingRect();
+    const sc = Math.max(fb.width / img.width, fb.height / img.height);
+    img.set({ left: fb.left, top: fb.top, scaleX: sc, scaleY: sc, name: 'Photo',
+      clipPath: new fabric.Rect({ left: fb.left, top: fb.top, width: fb.width, height: fb.height, absolutePositioned: true }) });
+    const idx = canvas.getObjects().indexOf(frame);
+    if (idx >= 0) canvas.insertAt(img, idx); else canvas.add(img);
+    canvas.remove(frame); canvas.setActiveObject(img); canvas.renderAll(); pushHistory(); markUnsaved();
+    toast('🖼️ Photo frame mein fit ho gayi');
+  }, { crossOrigin: 'anonymous' });
+}
 function addSticker(emoji){ center(new fabric.Text(emoji, { fontSize: Math.round(currentSize.w*.14), name:'Sticker' })); }
 function addImageURL(url){
+  const act = active();
+  if (act && act.name === 'Photo Frame'){ fillFrame(act, url); return; }
   fabric.Image.fromURL(url, img => {
     if (!img || !img.width) { toast('⚠️ Photo load nahi hui — internet check karein'); return; }
     const max = currentSize.w * .62, sc = Math.min(max / img.width, max / img.height, 1);
@@ -999,13 +1110,13 @@ function renderUploads(){
 }
 const PHOTO_SEEDS = ['nature','city','food','travel','tech','people','animal','fashion','work','art','sport','music'];
 const PHOTO_CATS = {
-  'All': ['nature','city','food','travel','tech','people','animal','fashion'],
-  'Nature': ['mountain','river','forest','ocean','sunset','desert','garden','snow'],
-  'City': ['street','building','bridge','market','night','tower','cafe','road'],
-  'Food': ['burger','pizza','cake','coffee','fruit','spice','bbq','dessert'],
-  'People': ['smile','team','student','family','artist','worker','sport','dance'],
-  'Business': ['office','meeting','laptop','growth','idea','store','delivery','craft'],
-  'Pakistan': ['hunza','lahore','karachi','mosque','truck','bazaar','cricket','mehndi']
+  'All': ['nature','city','food','travel','tech','people','animal','fashion','beach','books','plants','watch'],
+  'Nature': ['mountain','river','forest','ocean','sunset','desert','garden','snow','waterfall','lake','valley','island'],
+  'City': ['street','building','bridge','market','night','tower','cafe','road','metro','alley','plaza','harbor'],
+  'Food': ['burger','pizza','cake','coffee','fruit','spice','bbq','dessert','salad','pasta','tea','breakfast'],
+  'People': ['smile','team','student','family','artist','worker','sport','dance','chef','teacher','farmer','kids'],
+  'Business': ['office','meeting','laptop','growth','idea','store','delivery','craft','desk','graph','startup','workshop'],
+  'Pakistan': ['hunza','lahore','karachi','mosque','truck','bazaar','cricket','mehndi','fort','desertpk','sindh','punjab']
 };
 let photoCat = 'All';
 function setPhotoCat(c){ photoCat = c; renderPhotos(); }
@@ -1038,6 +1149,7 @@ function addPhoto(url, xP, yP, wP, hP, r){
     try {
       fabric.Image.fromURL(url, img => {
         if (!img){ res(); return; }
+        if (!cv.contextContainer){ res(); return; }
         const s = Math.max(w / img.width, h / img.height);
         img.set({ left:x, top:y, scaleX:s, scaleY:s, name:'Photo',
           clipPath: new fabric.Rect({ left:x, top:y, width:w, height:h, rx:rad, ry:rad, absolutePositioned:true }) });
@@ -1460,10 +1572,70 @@ function startBlank(sizeId){
   canvas.renderAll(); renderLayers(); fitZoom();
 }
 
+/* ================= MULTI-PAGE ================= */
+let docPages = null, docPageIdx = 0;
+const PAGE_JSON_PROPS = ['selectable','evented','name','__locked','__f','__curve','__grad'];
+function capturePage(){ return { json: JSON.stringify(canvas.toJSON(PAGE_JSON_PROPS)), bg: typeof canvas.backgroundColor === 'string' ? canvas.backgroundColor : '#ffffff' }; }
+function emptyPage(){ return { json: JSON.stringify({ version: '5.3.0', objects: [], background: '#ffffff' }), bg: '#ffffff' }; }
+function applyPage(p){
+  saving = true;
+  canvas.loadFromJSON(p.json, () => {
+    canvas.setBackgroundColor(p.bg || '#ffffff', () => {});
+    canvas.renderAll(); saving = false; history = []; hIndex = -1; pushHistory(true); renderLayers(); renderPageStrip();
+  });
+}
+function ensurePages(){ if (!docPages){ docPages = [capturePage()]; docPageIdx = 0; } }
+function switchPage(i){
+  if (!docPages || i === docPageIdx || i < 0 || i >= docPages.length) return;
+  docPages[docPageIdx] = capturePage(); docPageIdx = i; applyPage(docPages[i]); markUnsaved();
+}
+function addPage(){
+  ensurePages();
+  if (docPages.length >= 20){ toast('⚠️ Max 20 pages'); return; }
+  docPages[docPageIdx] = capturePage();
+  docPages.splice(docPageIdx + 1, 0, emptyPage());
+  docPageIdx++; applyPage(docPages[docPageIdx]); markUnsaved();
+  toast('📄 Naya page add ho gaya — kul ' + docPages.length + ' pages');
+}
+function dupPage(){
+  ensurePages();
+  if (docPages.length >= 20){ toast('⚠️ Max 20 pages'); return; }
+  docPages[docPageIdx] = capturePage();
+  docPages.splice(docPageIdx + 1, 0, JSON.parse(JSON.stringify(docPages[docPageIdx])));
+  docPageIdx++; applyPage(docPages[docPageIdx]); markUnsaved();
+  toast('⧉ Page duplicate ho gaya');
+}
+function delPage(){
+  if (!docPages || docPages.length <= 1){ toast('Ek hi page hai — ye delete nahi hoga'); return; }
+  docPages.splice(docPageIdx, 1);
+  docPageIdx = Math.max(0, docPageIdx - 1);
+  applyPage(docPages[docPageIdx]); markUnsaved();
+  toast('🗑️ Page delete ho gaya');
+}
+function movePage(dir){
+  if (!docPages) return;
+  const j = docPageIdx + dir; if (j < 0 || j >= docPages.length) return;
+  docPages[docPageIdx] = capturePage();
+  const tmp = docPages[docPageIdx]; docPages[docPageIdx] = docPages[j]; docPages[j] = tmp;
+  docPageIdx = j; renderPageStrip(); markUnsaved();
+}
+function renderPageStrip(){
+  const strip = document.getElementById('pageStrip'); if (!strip) return;
+  const n = docPages ? docPages.length : 1;
+  strip.style.display = '';
+  let h = '<span class="ps-lbl">Pages</span>';
+  for (let i = 0; i < n; i++) h += `<button class="ps-btn ${i === docPageIdx ? 'active' : ''}" onclick="switchPage(${i})">${i + 1}</button>`;
+  h += `<button class="ps-btn add" onclick="addPage()" title="Add page">＋</button><button class="ps-btn" onclick="dupPage()" title="Duplicate page">⧉</button><button class="ps-btn" onclick="movePage(-1)" title="Page peeche">◀</button><button class="ps-btn" onclick="movePage(1)" title="Page aage">▶</button><button class="ps-btn danger" onclick="delPage()" title="Delete page">🗑</button>`;
+  strip.innerHTML = h;
+}
+function resetPages(pages, idx){ docPages = pages ? JSON.parse(JSON.stringify(pages)) : null; docPageIdx = idx || 0; renderPageStrip(); }
+
 /* ================= SAVE / LOAD ================= */
 function designSnapshot(){
   canvas.discardActiveObject(); canvas.renderAll();
-  return { json: JSON.stringify(canvas.toJSON(['selectable','evented','name','__locked','__f','__curve','__grad'])),
+  let pages = null;
+  if (docPages){ docPages[docPageIdx] = capturePage(); pages = JSON.parse(JSON.stringify(docPages)); }
+  return { pages, pageIndex: docPageIdx, json: JSON.stringify(canvas.toJSON(['selectable','evented','name','__locked','__f','__curve','__grad'])),
     bg: typeof canvas.backgroundColor === 'string' ? canvas.backgroundColor : '#ffffff',
     thumb: canvas.toDataURL({ format:'jpeg', quality:.6, multiplier: Math.min(300/currentSize.w, 1) }) };
 }
@@ -1492,6 +1664,7 @@ function loadDesign(id){
   canvas.loadFromJSON(d.json, () => {
     canvas.setBackgroundColor(d.bg || '#ffffff', () => {});
     canvas.renderAll(); saving = false; history = []; hIndex = -1; pushHistory(true); renderLayers(); fitZoom();
+    resetPages(d.pages, d.pageIndex || 0);
     currentDesignId = d.id; document.getElementById('docTitle').value = d.name;
     document.getElementById('savedNote').textContent = '✓ Saved';
   });
@@ -1513,7 +1686,7 @@ function copyShare(){ const i = document.getElementById('shareLink'); i.select()
 function openSharedDesign(json){
   openEditor(null, null);
   saving = true;
-  canvas.loadFromJSON(json, () => { canvas.renderAll(); saving = false; history = []; hIndex = -1; pushHistory(true); renderLayers(); fitZoom(); currentDesignId = null; document.getElementById('docTitle').value = 'Shared design (copy)'; toast('🔗 Shared design opened — Save to keep your copy'); });
+  canvas.loadFromJSON(json, () => { canvas.renderAll(); saving = false; history = []; hIndex = -1; pushHistory(true); renderLayers(); fitZoom(); resetPages(null, 0); currentDesignId = null; document.getElementById('docTitle').value = 'Shared design (copy)'; toast('🔗 Shared design opened — Save to keep your copy'); });
   history.replaceState(null, '', location.pathname);
 }
 
@@ -1565,6 +1738,52 @@ function withWatermark(fn){
   document.getElementById('exportMenu').style.display = 'none';
 }
 function exportPNG(mult){ if (mult > 1 && !isPro()){ requirePro('HD export'); return; } withWatermark(() => downloadURI(canvas.toDataURL({ format:'png', multiplier: mult }), 'kanva-design.png')); toast('⬇️ PNG downloaded' + (mult > 1 ? ' (HD)' : '')); }
+function exportPrintPDF(){
+  const bleed = 36, mult = 3;
+  withWatermark(() => {
+    const img = canvas.toDataURL({ format: 'png', multiplier: mult });
+    const { jsPDF } = window.jspdf;
+    const W = currentSize.w + bleed * 2, H = currentSize.h + bleed * 2;
+    const pdf = new jsPDF({ orientation: W >= H ? 'landscape' : 'portrait', unit: 'px', format: [W, H], hotfixes: ['px_scaling'] });
+    pdf.addImage(img, 'PNG', bleed, bleed, currentSize.w, currentSize.h);
+    pdf.setDrawColor(0); pdf.setLineWidth(1);
+    const m = 10, L = 26, x0 = bleed, y0 = bleed, x1 = bleed + currentSize.w, y1 = bleed + currentSize.h;
+    pdf.line(x0 - m - L, y0, x0 - m, y0); pdf.line(x0, y0 - m - L, x0, y0 - m);
+    pdf.line(x1 + m, y0, x1 + m + L, y0); pdf.line(x1, y0 - m - L, x1, y0 - m);
+    pdf.line(x0 - m - L, y1, x0 - m, y1); pdf.line(x0, y1 + m, x0, y1 + m + L);
+    pdf.line(x1 + m, y1, x1 + m + L, y1); pdf.line(x1, y1 + m, x1, y1 + m + L);
+    pdf.save('kanva-print.pdf');
+  });
+  toast('⬇️ Print PDF downloaded — crop marks ke sath');
+}
+async function resizeCopy(){
+  const list = SIZES.map((sz, i) => (i + 1) + '. ' + sz.name + ' (' + sz.w + '×' + sz.h + ')').join('\n');
+  const pick = prompt('Resize a COPY to:\n' + list + '\n\nType a number:', '1');
+  const sz = SIZES[parseInt(pick) - 1]; if (!sz) return;
+  const ds = getDesigns();
+  if (!isPro() && ds.filter(x => !x.trashed).length >= 5){ requirePro('Unlimited projects (Free limit: 5)'); return; }
+  ensurePages();
+  docPages[docPageIdx] = capturePage();
+  const oldW = currentSize.w, oldH = currentSize.h, sx = sz.w / oldW, sy = sz.h / oldH;
+  const scaleJson = (jsonStr) => new Promise(res => {
+    const tc = new fabric.StaticCanvas(null, { width: oldW, height: oldH });
+    tc.loadFromJSON(jsonStr, () => {
+      tc.getObjects().forEach(o => { o.left *= sx; o.top *= sy; o.scaleX *= sx; o.scaleY *= sy; o.setCoords(); });
+      tc.setWidth(sz.w); tc.setHeight(sz.h); tc.renderAll();
+      const out = { json: JSON.stringify(tc.toJSON(PAGE_JSON_PROPS)), thumb: tc.toDataURL({ format: 'jpeg', quality: .6, multiplier: Math.min(300 / sz.w, 1) }) };
+      tc.dispose(); res(out);
+    });
+  });
+  const scaled = [];
+  for (const p of docPages){ const r = await scaleJson(p.json); scaled.push({ json: r.json, bg: p.bg, thumb: r.thumb }); }
+  const rec = { id: Date.now(), name: (document.getElementById('docTitle').value.trim() || 'Untitled design') + ' (' + sz.name + ')',
+    sizeId: sz.id, sizeName: sz.name, sizeW: sz.w, sizeH: sz.h, updated: new Date().toLocaleString(), trashed: false,
+    json: scaled[docPageIdx].json, bg: docPages[docPageIdx].bg, thumb: scaled[docPageIdx].thumb,
+    pages: scaled.map(p => ({ json: p.json, bg: p.bg })), pageIndex: docPageIdx, folder: '' };
+  ds.unshift(rec); saveDesigns(ds);
+  toast('📐 Copy tayyar hai — ' + sz.name + ' mein khul rahi hai');
+  loadDesign(rec.id);
+}
 function exportTransparent(){
   const prevBg = canvas.backgroundColor;
   withWatermark(() => {
@@ -1804,9 +2023,45 @@ try { document.querySelectorAll('img[data-ic]').forEach(im => { const s = (windo
   if (!sessionRestored){ document.getElementById('view-auth').style.display = ''; }
   try { renderTemplateGrids(); } catch(e){}
   try { renderShowcase(); } catch(e){}
+  try { loadCustomFonts(); } catch(e){}
 })();
 googleWatchdog();
 
+
+/* ================= CUSTOM FONTS (device-local) ================= */
+function refreshFontSelects(){
+  const pf = document.getElementById('pFont');
+  if (pf){ const cur = pf.value; pf.innerHTML = FONTS.map(f => `<option value="${f}" style="font-family:'${f}'">${f}</option>`).join(''); if (cur) pf.value = cur; }
+}
+function registerCustomFont(name, dataUrl, silent){
+  try {
+    const ff = new FontFace(name, 'url(' + dataUrl + ')');
+    return ff.load().then(loaded => {
+      document.fonts.add(loaded);
+      if (!FONTS.includes(name)){ FONTS.push(name); refreshFontSelects(); }
+      if (!silent) toast('🔤 Font "' + name + '" add ho gaya — ab Text ke fonts mein milega');
+      return true;
+    }).catch(() => { if (!silent) toast('⚠️ Font load nahi hua — file check karke dobara try karein'); return false; });
+  } catch(e){ if (!silent) toast('⚠️ Ye font is browser mein support nahi hai'); return Promise.resolve(false); }
+}
+function handleFontUpload(ev){
+  const f = ev.target.files[0]; ev.target.value = ''; if (!f) return;
+  if (f.size > 2.5 * 1024 * 1024){ toast('⚠️ Font file bohat bari hai — max 2.5 MB'); return; }
+  const name = (f.name.replace(/\.(ttf|otf|woff2?)$/i, '').replace(/[^a-zA-Z0-9 _-]/g, '').trim() || 'My Font');
+  const rd = new FileReader();
+  rd.onload = () => {
+    registerCustomFont(name, rd.result).then(ok => {
+      if (ok){
+        try { const saved = JSON.parse(localStorage.getItem('kv_custom_fonts') || '[]'); saved.push({ name, data: rd.result }); localStorage.setItem('kv_custom_fonts', JSON.stringify(saved)); }
+        catch(e){ toast('ℹ️ Font is session ke liye add hai — phone storage full hone se hamesha ke liye save nahi hua'); }
+      }
+    });
+  };
+  rd.readAsDataURL(f);
+}
+function loadCustomFonts(){
+  try { (JSON.parse(localStorage.getItem('kv_custom_fonts') || '[]')).forEach(cf => registerCustomFont(cf.name, cf.data, true)); } catch(e){}
+}
 
 /* ================= ACCOUNT / PROFILE ================= */
 async function renderAccount(){
@@ -1896,4 +2151,123 @@ Object.assign(BUILDERS, {
     addAt(T('اللہ ہم سب کی عبادتیں قبول فرمائے', { fontFamily:'Noto Nastaliq Urdu', fontSize:W*.042, fill:'#dfe3ff', width:W*.84, lineHeight:2 }), .5, .56);
     addAt(T('— KANVA GREETINGS —', { fontFamily:'Montserrat', fontSize:W*.024, fill:'rgba(255,255,255,.65)', charSpacing:240, width:W*.7 }), .5, .90);
   }
+});
+
+/* ---- Wave 2 templates: local categories (weddings, Eid, education, food, shops) ---- */
+TEMPLATES.push(
+  { id:'walima',    title:'Walima Invitation',  sub:'Wedding walima card',   cat:'Events',    pro:false, size:'ig-story', bg:['#7f1d1d','#450a0a'] },
+  { id:'nikkah',    title:'Nikkah Ceremony',    sub:'Urdu + English card',   cat:'Events',    pro:true,  size:'ig-story', bg:['#064e3b','#022c22'] },
+  { id:'eidazha',   title:'Eid-ul-Azha',        sub:'Bari Eid greeting',     cat:'Events',    pro:false, size:'ig-post',  bg:['#065f46','#022c22'] },
+  { id:'chandraat', title:'Chand Raat',         sub:'Eid night invite',      cat:'Events',    pro:true,  size:'ig-story', bg:['#1e1b4b','#4c1d95'] },
+  { id:'iftar',     title:'Iftar Dinner',       sub:'Ramadan invitation',    cat:'Events',    pro:false, size:'ig-post',  bg:['#78350f','#451a03'] },
+  { id:'admissions',title:'Admissions Open',    sub:'School admissions',     cat:'Education', pro:false, size:'ig-post',  bg:['#1e3a8a','#0f172a'] },
+  { id:'coaching',  title:'Coaching Classes',   sub:'Academy new batch',     cat:'Education', pro:true,  size:'ig-post',  bg:['#0f172a','#1e293b'] },
+  { id:'repair',    title:'Mobile Repair',      sub:'Repair shop promo',     cat:'Business',  pro:true,  size:'ig-post',  bg:['#111827','#030712'] },
+  { id:'restaurant',title:'Restaurant Promo',   sub:'Dine-in offer',         cat:'Food',      pro:true,  size:'ig-post',  bg:['#1c0a00','#000000'] },
+  { id:'biryani',   title:'Biryani Special',    sub:'Food deal of the day',  cat:'Food',      pro:false, size:'ig-post',  bg:['#7c2d12','#431407'] },
+  { id:'mehndi',    title:'Mehndi Night',       sub:'Mehndi celebration',    cat:'Events',    pro:true,  size:'ig-story', bg:['#a16207','#713f12'] },
+  { id:'bdaybash',  title:'Birthday Party',     sub:'Kids birthday invite',  cat:'Social Media', pro:false, size:'ig-post', bg:['#ec4899','#8b3dff'] }
+);
+Object.assign(BUILDERS, {
+  walima(){ gradRect('#7f1d1d','#450a0a'); const W = currentSize.w;
+    deco(.08, .05, .12, '#f5c542', .25); deco(.95, .9, .14, '#f5c542', .18); deco(.9, .06, .05, '#ffffff', .2);
+    addAt(T('WALIMA', { fontFamily:'Playfair Display', fontSize:W*.13, fill:'#f5c542', fontWeight:700, width:W*.9 }), .5, .14);
+    addAt(T('C E R E M O N Y', { fontFamily:'Montserrat', fontSize:W*.026, fill:'#fecdd3', width:W*.7, charSpacing:300 }), .5, .27);
+    addAt(T('Ahmed', { fontFamily:'Pacifico', fontSize:W*.11, fill:'#ffffff', width:W*.9 }), .5, .36);
+    addAt(T('&', { fontFamily:'Playfair Display', fontSize:W*.07, fill:'#f5c542', width:W*.4 }), .5, .47);
+    addAt(T('Fatima', { fontFamily:'Pacifico', fontSize:W*.11, fill:'#ffffff', width:W*.9 }), .5, .54);
+    hline(.5, .68, .2, '#f5c542', 4);
+    pill('SUNDAY · 21 DECEMBER · 7 PM', .5, .73, .62, '#f5c542', '#450a0a', .026);
+    addAt(T('Crystal Banquet Hall, Karachi', { fontFamily:'Inter', fontSize:W*.03, fill:'#ffe4e6', width:W*.8 }), .5, .82);
+    addAt(T('Your presence is requested', { fontFamily:'Inter', fontSize:W*.024, fill:'rgba(255,255,255,.6)', width:W*.7 }), .5, .9); },
+  nikkah(){ gradRect('#064e3b','#022c22'); const W = currentSize.w;
+    crescent(.5, .12, .055, '#f5c542', '#065f46');
+    deco(.1, .3, .05, '#f5c542', .3); deco(.9, .3, .05, '#f5c542', .3);
+    addAt(T('نکاح مبارک', { fontFamily:'Noto Nastaliq Urdu', fontSize:W*.085, fill:'#f5c542', width:W*.88, lineHeight:1.9 }), .5, .2);
+    addAt(T('NIKKAH CEREMONY', { fontFamily:'Montserrat', fontSize:W*.045, fill:'#ffffff', fontWeight:700, width:W*.9, charSpacing:120 }), .5, .42);
+    addAt(T('Zainab & Bilal', { fontFamily:'Playfair Display', fontSize:W*.075, fill:'#d1fae5', fontWeight:700, width:W*.88 }), .5, .52);
+    hline(.5, .63, .18, '#f5c542', 4);
+    pill('FRIDAY · AFTER JUMMAH', .5, .7, .56, '#f5c542', '#022c22', .026);
+    addAt(T('Jamia Masjid Hall — families are requested to join the dua', { fontFamily:'Inter', fontSize:W*.027, fill:'#a7f3d0', width:W*.8, lineHeight:1.4 }), .5, .79); },
+  eidazha(){ gradRect('#065f46','#022c22'); const W = currentSize.w;
+    crescent(.5, .16, .07, '#f5c542', '#065f46');
+    deco(.08, .06, .06, '#ffffff', .25); deco(.93, .12, .04, '#f5c542', .5); deco(.88, .8, .09, '#f5c542', .15);
+    addAt(T('EID-UL-AZHA', { fontFamily:'Bebas Neue', fontSize:W*.14, fill:'#ffffff', fontWeight:700, width:W*.92 }), .5, .3);
+    addAt(T('Mubarak', { fontFamily:'Pacifico', fontSize:W*.085, fill:'#f5c542', width:W*.8 }), .5, .47);
+    addAt(T('May your sacrifices be accepted and your home filled with blessings.', { fontFamily:'Inter', fontSize:W*.031, fill:'#d1fae5', width:W*.8, lineHeight:1.45 }), .5, .6);
+    pill('QURBANI · FAMILY · BLESSINGS', .5, .76, .6, '#f5c542', '#022c22', .027);
+    addAt(T('— FROM OUR FAMILY TO YOURS —', { fontFamily:'Montserrat', fontSize:W*.022, fill:'rgba(255,255,255,.65)', charSpacing:200, width:W*.7 }), .5, .9); },
+  chandraat(){ gradRect('#1e1b4b','#4c1d95'); const W = currentSize.w;
+    crescent(.5, .14, .08, '#f5c542', '#2e1065');
+    deco(.12, .3, .035, '#ffffff', .5); deco(.86, .26, .045, '#f9a8d4', .5); deco(.8, .5, .03, '#ffffff', .35);
+    addAt(T('CHAND RAAT', { fontFamily:'Bebas Neue', fontSize:W*.15, fill:'#ffffff', fontWeight:700, width:W*.92 }), .5, .3);
+    addAt(T('Mubarak', { fontFamily:'Pacifico', fontSize:W*.09, fill:'#f9a8d4', width:W*.8 }), .5, .46);
+    addAt(T('Mehndi · Bangles · Mithaas — the night before Eid', { fontFamily:'Inter', fontSize:W*.03, fill:'#e9d5ff', width:W*.82, lineHeight:1.45 }), .5, .58);
+    pill('TONIGHT FROM 8 PM', .5, .7, .5, '#ec4899', '#ffffff', .028);
+    addAt(T('At home — all friends & family welcome', { fontFamily:'Inter', fontSize:W*.026, fill:'rgba(255,255,255,.65)', width:W*.75 }), .5, .85); },
+  iftar(){ const W = currentSize.w;
+    addPhoto(PH('spice'), 0, 0, 1, 1, 0);
+    shade(0, 0, 1, 1, '#1c0a00', .58);
+    deco(.9, .06, .06, '#f5c542', .4);
+    addAt(T('IFTAR DINNER', { fontFamily:'Bebas Neue', fontSize:W*.135, fill:'#ffffff', fontWeight:700, width:W*.92 }), .5, .16);
+    addAt(T('You are warmly invited to break fast with us', { fontFamily:'Inter', fontSize:W*.033, fill:'#ffedd5', width:W*.82, lineHeight:1.45 }), .5, .36);
+    pill('MAGHRIB · 6:45 PM', .5, .52, .48, '#f5a623', '#1c0a00', .03);
+    addAt(T('At our home — bring your family along', { fontFamily:'Poppins', fontSize:W*.028, fill:'#ffffff', width:W*.8 }), .5, .66);
+    addAt(T('Dua before iftar — dinner after Maghrib prayer', { fontFamily:'Inter', fontSize:W*.025, fill:'rgba(255,255,255,.7)', width:W*.78 }), .5, .78); },
+  admissions(){ const W = currentSize.w;
+    addPhoto(PH('student'), 0, 0, 1, 1, 0);
+    shade(0, 0, 1, 1, '#0f172a', .74);
+    const bar = new fabric.Rect({ width:W*.16, height:W*.014, fill:'#f5c542', name:'Accent' }); addAt(bar, .5, .12);
+    addAt(T('ADMISSIONS OPEN', { fontFamily:'Bebas Neue', fontSize:W*.125, fill:'#ffffff', fontWeight:700, width:W*.94 }), .5, .18);
+    addAt(T('Session 2026 – 27 · Playgroup to Matric', { fontFamily:'Poppins', fontSize:W*.033, fill:'#dbeafe', width:W*.84 }), .5, .38);
+    addAt(T('Experienced teachers · Computer lab · Affordable fee · Sibling discount', { fontFamily:'Inter', fontSize:W*.027, fill:'#bfdbfe', width:W*.8, lineHeight:1.5 }), .5, .52);
+    pill('APPLY NOW', .5, .7, .4, '#f5c542', '#0f172a', .032);
+    addAt(T('Bright Future School · 0321-555 0142', { fontFamily:'Montserrat', fontSize:W*.024, fill:'rgba(255,255,255,.75)', width:W*.75 }), .5, .88); },
+  coaching(){ solidBg('#0f172a'); const W = currentSize.w;
+    const bar = new fabric.Rect({ width:W*.16, height:W*.014, fill:'#22d3ee', name:'Accent' }); addAt(bar, .5, .13);
+    addAt(T('COACHING CLASSES', { fontFamily:'Montserrat', fontSize:W*.095, fill:'#ffffff', fontWeight:900, width:W*.92, lineHeight:1.12 }), .5, .2);
+    addAt(T('Maths · Physics · Chemistry · English', { fontFamily:'Poppins', fontSize:W*.033, fill:'#a5f3fc', width:W*.85 }), .5, .42);
+    badge('NEW\nBATCH', .84, .3, .27, '#facc15', '#1e293b');
+    addAt(T('Classes 9 – 12 · Weekly tests · Notes included', { fontFamily:'Inter', fontSize:W*.028, fill:'#cbd5e1', width:W*.78, lineHeight:1.5 }), .34, .56);
+    pill('FREE DEMO CLASS', .5, .74, .46, '#0891b2', '#ffffff', .03);
+    addAt(T('SkillUp Academy · 0321-555 0177', { fontFamily:'Montserrat', fontSize:W*.024, fill:'rgba(255,255,255,.65)', width:W*.72 }), .5, .9); },
+  repair(){ const W = currentSize.w;
+    addPhoto(PH('tech'), 0, 0, 1, 1, 0);
+    shade(0, 0, 1, 1, '#030712', .72);
+    addAt(T('MOBILE REPAIR', { fontFamily:'Bebas Neue', fontSize:W*.13, fill:'#ffffff', fontWeight:700, width:W*.92 }), .5, .15);
+    addAt(T('Screen · Battery · Software · Unlocking', { fontFamily:'Poppins', fontSize:W*.033, fill:'#bae6fd', width:W*.85 }), .5, .35);
+    badge('30 MIN\nSERVICE', .84, .52, .3, '#22c55e', '#052e16');
+    addAt(T('Original parts · 3-month warranty · Fair prices', { fontFamily:'Inter', fontSize:W*.028, fill:'#e0f2fe', width:W*.62, lineHeight:1.5 }), .36, .55);
+    pill('VISIT TODAY', .5, .76, .4, '#0284c7', '#ffffff', .03);
+    addAt(T('Mobile Zone · Main Bazaar Road', { fontFamily:'Montserrat', fontSize:W*.024, fill:'rgba(255,255,255,.7)', width:W*.72 }), .5, .9); },
+  restaurant(){ const W = currentSize.w;
+    addPhoto(PH('bbq'), 0, 0, 1, 1, 0);
+    shade(0, 0, 1, 1, '#000000', .55);
+    addAt(T('THE FOOD HOUSE', { fontFamily:'Playfair Display', fontSize:W*.105, fill:'#ffffff', fontWeight:700, width:W*.92 }), .5, .14);
+    addAt(T('Taste of the town', { fontFamily:'Pacifico', fontSize:W*.06, fill:'#f5c542', width:W*.7 }), .5, .32);
+    badge('20%\nOFF', .85, .55, .27, '#f5a623', '#1c0a00');
+    addAt(T('BBQ · Karahi · Fast Food — fresh & hot, every evening', { fontFamily:'Inter', fontSize:W*.03, fill:'#fef3c7', width:W*.66, lineHeight:1.5 }), .37, .56);
+    pill('DINE IN · TAKEAWAY', .5, .78, .46, '#f5a623', '#1c0a00', .03);
+    addAt(T('0321-555 0190 · Open 12 PM – 12 AM', { fontFamily:'Montserrat', fontSize:W*.024, fill:'rgba(255,255,255,.75)', width:W*.72 }), .5, .92); },
+  biryani(){ const W = currentSize.w;
+    addPhoto(PH('spice'), 0, 0, 1, .6, 0);
+    shade(0, .6, 1, .4, '#431407', 1);
+    addAt(T('BIRYANI SPECIAL', { fontFamily:'Bebas Neue', fontSize:W*.125, fill:'#ffffff', fontWeight:700, width:W*.94 }), .5, .64);
+    addAt(T('Friday deal — Chicken Biryani only Rs 350 with raita & salad', { fontFamily:'Poppins', fontSize:W*.03, fill:'#fed7aa', width:W*.86 }), .5, .79);
+    pill('ORDER NOW · 0321-555 0131', .5, .9, .56, '#f97316', '#ffffff', .028); },
+  mehndi(){ gradRect('#a16207','#713f12'); const W = currentSize.w;
+    deco(.08, .06, .07, '#22c55e', .35); deco(.93, .1, .05, '#f5c542', .5); deco(.88, .82, .09, '#16a34a', .25); deco(.06, .85, .05, '#fef08a', .4);
+    addAt(T('Mehndi', { fontFamily:'Pacifico', fontSize:W*.15, fill:'#fef9c3', width:W*.9 }), .5, .16);
+    addAt(T('N I G H T', { fontFamily:'Montserrat', fontSize:W*.04, fill:'#ffffff', fontWeight:700, width:W*.8, charSpacing:400 }), .5, .36);
+    addAt(T('For Ayesha', { fontFamily:'Playfair Display', fontSize:W*.07, fill:'#ffffff', fontWeight:700, width:W*.85 }), .5, .46);
+    addAt(T('Dholki · Dance · Dinner — wear something green & yellow!', { fontFamily:'Inter', fontSize:W*.029, fill:'#fef3c7', width:W*.82, lineHeight:1.5 }), .5, .58);
+    pill('FRIDAY · 7 PM ONWARDS', .5, .72, .54, '#16a34a', '#ffffff', .027);
+    addAt(T('At the bride’s home — family & friends welcome', { fontFamily:'Inter', fontSize:W*.025, fill:'rgba(255,255,255,.7)', width:W*.75 }), .5, .86); },
+  bdaybash(){ gradRect('#ec4899','#8b3dff'); const W = currentSize.w;
+    deco(.07, .06, .055, '#fde047', .6); deco(.93, .08, .07, '#22d3ee', .5); deco(.88, .78, .05, '#fde047', .55); deco(.06, .8, .065, '#ffffff', .3); deco(.5, .04, .035, '#ffffff', .4);
+    addAt(T('HAPPY BIRTHDAY', { fontFamily:'Bebas Neue', fontSize:W*.125, fill:'#ffffff', fontWeight:700, width:W*.94 }), .5, .14);
+    addAt(T('Areeba turns 7!', { fontFamily:'Pacifico', fontSize:W*.085, fill:'#fde047', width:W*.85 }), .5, .33);
+    addAt(T('Cake · Games · Magic show · Lots of fun', { fontFamily:'Poppins', fontSize:W*.031, fill:'#ffffff', width:W*.82 }), .5, .52);
+    pill('SATURDAY · 5 PM', .5, .66, .44, '#fde047', '#831843', .03);
+    addAt(T('At home — friends & cousins are invited!', { fontFamily:'Inter', fontSize:W*.026, fill:'rgba(255,255,255,.8)', width:W*.75 }), .5, .82); }
 });
