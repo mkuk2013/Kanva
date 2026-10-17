@@ -9,7 +9,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="kanva-logo.png">
 <link rel="apple-touch-icon" href="Kanva icon 192.png">
-<link rel="stylesheet" href="style.css?v=21">
+<link rel="stylesheet" href="style.css?v=22">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700&family=Bebas+Neue&family=Pacifico&family=Montserrat:wght@500;700;900&family=Roboto:wght@400;700&family=Oswald:wght@500;700&family=Dancing+Script:wght@700&family=Anton&family=Lobster&family=Noto+Nastaliq+Urdu:wght@400;700&display=swap" rel="stylesheet">
 </head>
@@ -293,6 +293,7 @@
       <button class="ed-icon" onclick="undo()" title="Undo">↩</button>
       <button class="ed-icon" onclick="redo()" title="Redo">↪</button>
       <span class="saved-note" id="savedNote">✓ Saved</span>
+      <span class="saved-note" id="collabNote"></span>
     </div>
     <input id="docTitle" class="doc-title" value="Untitled design" onchange="docTitleChanged()">
     <div class="ed-right">
@@ -341,6 +342,8 @@
       </span>
       <span id="imgCtx" style="display:none">
         <button class="ctx-btn" onclick="removeBg()" title="AI se photo ka background remove karein (Pro)">🤖 Remove BG</button>
+        <button class="ctx-btn" onclick="bgStudio('blur')" title="Background blur — portrait style (Pro)">🌫️ Blur BG</button>
+        <button class="ctx-btn" onclick="bgStudio('color')" title="Background ki jagah solid color (Pro)">🎨 Color BG</button>
         <label class="ctx-lbl">☀ <input type="range" id="fBright" min="-60" max="60" value="0" title="Brightness" oninput="setFilter('b', this.value)"></label>
         <label class="ctx-lbl">◐ <input type="range" id="fContrast" min="-60" max="60" value="0" title="Contrast" oninput="setFilter('c', this.value)"></label>
         <label class="ctx-lbl">🎨 <input type="range" id="fSat" min="-100" max="100" value="0" title="Saturation" oninput="setFilter('s', this.value)"></label>
@@ -367,6 +370,7 @@
       <span class="ed-sep"></span>
       <label class="ctx-lbl">🎬 <select id="pAnim" onchange="setAnim(this.value)" title="Element animation"><option value="">No animation</option><option value="fade">Fade in</option><option value="rise">Rise up</option><option value="pop">Pop</option><option value="left">Slide left</option><option value="right">Slide right</option><option value="spin">Spin in</option></select></label>
       <button class="ctx-btn" onclick="playAnimations()">▶ Play</button>
+      <span id="vidCtx" style="display:none"><button class="ctx-btn" onclick="toggleVideoPlay()">⏯ Video play/pause</button></span>
       <span class="ed-sep"></span>
       <button class="ctx-btn" onclick="duplicateObj()">⧉ Duplicate</button>
       <button class="ctx-btn" onclick="bringForward()">⬆ Layer</button>
@@ -403,6 +407,14 @@
           <button class="btn btn-ghost" onclick="addCollage(2)">2 photos</button>
           <button class="btn btn-ghost" onclick="addCollage(3)">3 photos</button>
           <button class="btn btn-ghost" onclick="addCollage(4)">4 photos</button>
+        </div>
+        <h4>Whiteboard kit</h4>
+        <p class="muted small">Planning aur teaching ke liye — Whiteboard size (New Design mein) ke sath behtareen.</p>
+        <div class="collage-btns">
+          <button class="btn btn-ghost" onclick="addSticky('#fef08a')">🗒️ Yellow note</button>
+          <button class="btn btn-ghost" onclick="addSticky('#bbf7d0')">🗒️ Green note</button>
+          <button class="btn btn-ghost" onclick="addSticky('#fbcfe8')">🗒️ Pink note</button>
+          <button class="btn btn-ghost" onclick="addArrow()">➡️ Arrow</button>
         </div>
         <h4>Tables</h4>
         <div class="mini-form">
@@ -456,6 +468,8 @@ Visitors, 90</textarea>
         <div class="upload-grid" id="uploadGrid"></div>
         <h4>Custom fonts</h4>
         <label class="btn btn-ghost btn-block">🔤 Upload font (.ttf / .otf)<input type="file" accept=".ttf,.otf,.woff,.woff2" hidden onchange="handleFontUpload(event)"></label>
+        <label class="btn btn-ghost btn-block">🎬 Upload video (MP4 · ≤15MB)<input type="file" accept="video/*" hidden onchange="if(this.files[0]) addVideoFile(this.files[0]); this.value=''"></label>
+        <p class="muted small">Video canvas par chalti hai aur GIF/Video export mein bhi ati hai. 4MB tak ki video design ke sath save hoti hai.</p>
         <p class="muted small">Apna font is device par save hota hai — phir Text ke fonts mein ajata hai.</p>
         <div id="brandLogoPanel"></div>
       </div>
@@ -554,7 +568,7 @@ Visitors, 90</textarea>
 <script src="icons1.js?v=3"></script>
 <script src="icons2.js?v=3"></script>
 <script src="icons3.js?v=3"></script>
-<script src="app.js?v=33"></script>
+<script src="app.js?v=34"></script>
 <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(()=>{}); }</script>
 </body>
 </html>
