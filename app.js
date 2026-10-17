@@ -117,11 +117,11 @@ async function afterAuth(user, silent){
 function rowToDesign(r){
   const d = r.data || {};
   return { id: r.id, name: r.name, sizeId: r.size_id, sizeName: r.size_name, sizeW: r.size_w, sizeH: r.size_h,
-           json: d.json, bg: d.bg, thumb: d.thumb, pages: d.pages || null, folder: d.folder || '', trashed: !!r.trashed,
+           json: d.json, bg: d.bg, thumb: d.thumb, pages: d.pages || null, folder: d.folder || '', notes: d.notes || null, comments: d.comments || null, versions: d.versions || null, trashed: !!r.trashed,
            updated: r.updated_at ? new Date(r.updated_at).toLocaleString() : '' };
 }
 function fingerprintOf(d){
-  return [d.name, d.trashed ? 1 : 0, (d.json || '').length, (d.thumb || '').length, d.bg || '', d.sizeW || 0, d.sizeH || 0, d.sizeId || '', (d.pages || []).reduce((a, p) => a + (p.json || '').length, 0), d.folder || ''].join('|');
+  return [d.name, d.trashed ? 1 : 0, (d.json || '').length, (d.thumb || '').length, d.bg || '', d.sizeW || 0, d.sizeH || 0, d.sizeId || '', (d.pages || []).reduce((a, p) => a + (p.json || '').length, 0), d.folder || '', (d.notes || []).join(' ').length].join('|');
 }
 async function loadCloudData(){
   try {
@@ -152,7 +152,7 @@ async function migrateLocalDesigns(){
     const local = JSON.parse(localStorage.getItem(key) || '[]');
     if (!local.length || localStorage.getItem('kv_migrated3_' + currentUser.email)) return;
     const rows = local.map(d => ({ id: d.id, user_id: cloudUser.id, name: d.name, size_id: d.sizeId, size_name: d.sizeName,
-      size_w: d.sizeW, size_h: d.sizeH, data: { json: d.json, bg: d.bg, thumb: d.thumb, pages: d.pages || null, folder: d.folder || '' }, trashed: !!d.trashed }));
+      size_w: d.sizeW, size_h: d.sizeH, data: { json: d.json, bg: d.bg, thumb: d.thumb, pages: d.pages || null, folder: d.folder || '', notes: d.notes || null, comments: d.comments || null, versions: d.versions || null }, trashed: !!d.trashed }));
     const { error } = await sb.from('designs').insert(rows);
     if (!error){
       designsCache = local.slice();
@@ -515,7 +515,7 @@ function openEditor(sizeId, tplId){
   document.getElementById('view-editor').style.display = '';
   if (!editorCanvas) initCanvas(); else if (canvas !== editorCanvas) canvas = editorCanvas;
   if (sizeId) setSize(sizeId);
-  resetPages(null, 0);
+  resetPages(null, 0); docNotes = []; docComments = [];
   if (tplId) applyTemplate(tplId);
   const sp = document.querySelector('.sidepanel');
   if (sp && window.innerWidth <= 900) sp.classList.remove('open');
@@ -554,6 +554,15 @@ function initCanvas(){
   canvas.on('selection:created', syncProps); canvas.on('selection:updated', syncProps);
   canvas.on('selection:cleared', () => { document.getElementById('ctxControls').style.display='none'; document.getElementById('ctxHint').style.display=''; renderLayers(); });
   ['object:added','object:removed','object:modified'].forEach(ev => canvas.on(ev, () => { if (!saving){ pushHistory(); markUnsaved(); } renderLayers(); }));
+  canvas.on('mouse:down', e => {
+    if (!commentMode) return;
+    const p = canvas.getPointer(e.e);
+    const text = prompt('💬 Comment likhein (pin is jagah lagega):');
+    if (!text || !text.trim()) return;
+    docComments.push({ by: currentUser ? currentUser.name : 'User', text: text.trim(), x: +(p.x / currentSize.w).toFixed(4), y: +(p.y / currentSize.h).toFixed(4), resolved: false, ts: Date.now() });
+    rebuildPins(); markUnsaved();
+    toast('💬 Comment pin lag gaya');
+  });
   buildSidebars(); renderUploads(); renderPhotos(); pushHistory(true);
 }
 function markUnsaved(){ document.getElementById('savedNote').textContent = '● Unsaved changes'; scheduleAutosave(); }
@@ -590,7 +599,7 @@ function zoomOut(){ zoom = Math.max(.07, zoom / 1.15); applyZoom(); }
 /* history */
 function pushHistory(init){
   if (saving) return;
-  const json = JSON.stringify(canvas.toJSON(['selectable','evented','name','__locked','__f','__curve','__grad']));
+  const json = JSON.stringify(canvas.toJSON(['selectable','evented','name','__locked','__f','__curve','__grad','__anim','__origFont']));
   if (!init && history[hIndex] === json) return;
   history = history.slice(0, hIndex + 1); history.push(json);
   if (history.length > 60) history.shift();
@@ -783,6 +792,7 @@ function syncProps(){
   const ga = document.getElementById('gradA'), gb = document.getElementById('gradB');
   if (ga && gb){ if (o.__grad){ ga.value = o.__grad.a; gb.value = o.__grad.b; } else if (typeof o.fill === 'string'){ ga.value = o.fill; } }
   const pcv = document.getElementById('pCurve'); if (pcv && o.__curve) pcv.value = o.__curve.angle;
+  const pa = document.getElementById('pAnim'); if (pa) pa.value = o.__anim ? o.__anim.type : '';
   document.getElementById('pOpacity').value = Math.round((o.opacity ?? 1) * 100);
   if (isText){
     document.getElementById('pFont').value = o.fontFamily || 'Poppins';
@@ -992,6 +1002,12 @@ function setBgPattern(kind){
   if (kind==='dots'){ g.beginPath(); g.arc(7,7,3.2,0,7); g.arc(21,21,3.2,0,7); g.fill(); }
   if (kind==='grid'){ g.lineWidth = 2; g.strokeRect(0,0,28,28); }
   if (kind==='lines'){ g.lineWidth = 3; g.beginPath(); g.moveTo(-2,30); g.lineTo(30,-2); g.stroke(); }
+  if (kind==='waves'){ g.lineWidth = 3; g.beginPath(); g.moveTo(0, 14); g.quadraticCurveTo(7, 4, 14, 14); g.quadraticCurveTo(21, 24, 28, 14); g.stroke(); }
+  if (kind==='zigzag'){ g.lineWidth = 3; g.beginPath(); g.moveTo(0, 20); g.lineTo(7, 8); g.lineTo(14, 20); g.lineTo(21, 8); g.lineTo(28, 20); g.stroke(); }
+  if (kind==='stripes'){ g.lineWidth = 5; g.beginPath(); g.moveTo(0, 7); g.lineTo(28, 7); g.moveTo(0, 21); g.lineTo(28, 21); g.stroke(); }
+  if (kind==='tri'){ g.beginPath(); g.moveTo(14, 5); g.lineTo(24, 23); g.lineTo(4, 23); g.closePath(); g.fill(); }
+  if (kind==='cross'){ g.fillRect(11, 4, 6, 20); g.fillRect(4, 11, 20, 6); }
+  if (kind==='confetti'){ g.fillRect(4, 5, 6, 3); g.fillRect(18, 16, 6, 3); g.beginPath(); g.arc(20, 7, 2.6, 0, 7); g.arc(7, 20, 2.6, 0, 7); g.fill(); }
   removeBgRect(); canvas.setBackgroundColor('#ffffff', () => {});
   const rect = new fabric.Rect({ left:0, top:0, width: currentSize.w, height: currentSize.h, selectable:false, evented:false, name:'__bg' });
   rect.set('fill', new fabric.Pattern({ source: pc, repeat: 'repeat' }));
@@ -1002,7 +1018,7 @@ function setBgPattern(kind){
 /* layers */
 function renderLayers(){
   const list = document.getElementById('layerList'); if (!list || !canvas) return;
-  const objs = canvas.getObjects().filter(o => o.name !== '__bg' && o.name !== '__wm').slice().reverse();
+  const objs = canvas.getObjects().filter(o => o.name !== '__bg' && o.name !== '__wm' && o.name !== '__pin').slice().reverse();
   if (!objs.length){ list.innerHTML = '<p class="muted small">No layers yet.</p>'; return; }
   list.innerHTML = objs.map(o => {
     const idx = canvas.getObjects().indexOf(o);
@@ -1055,7 +1071,7 @@ function buildSidebars(){
   }
   const grads = [['#8b3dff','#ec4899'],['#f5a623','#ef4444'],['#00c4cc','#3b82f6'],['#22c55e','#00c4cc'],['#f43f5e','#f5a623'],['#0f172a','#8b3dff'],['#fdfbfb','#ebedee'],['#134e5e','#71b280']];
   document.getElementById('bgGradients').innerHTML = grads.map(([a,bb]) => `<div class="swatch" style="background:linear-gradient(135deg,${a},${bb})" onclick="setBgGradient('${a}','${bb}')"></div>`).join('');
-  const pats = [['dots','⚫ Dots'],['grid','▦ Grid'],['lines','≋ Lines']];
+  const pats = [['dots','⚫ Dots'],['grid','▦ Grid'],['lines','≋ Lines'],['waves','〰 Waves'],['zigzag','⚡ Zigzag'],['stripes','☰ Stripes'],['tri','▲ Triangles'],['cross','✚ Cross'],['confetti','🎊 Confetti']];
   document.getElementById('bgPatterns').innerHTML = pats.map(([k,l]) => `<div class="swatch pat-swatch" title="${l}" onclick="setBgPattern('${k}')">${l}</div>`).join('');
   renderTemplateLists();
 }
@@ -1574,8 +1590,8 @@ function startBlank(sizeId){
 
 /* ================= MULTI-PAGE ================= */
 let docPages = null, docPageIdx = 0;
-const PAGE_JSON_PROPS = ['selectable','evented','name','__locked','__f','__curve','__grad'];
-function capturePage(){ return { json: JSON.stringify(canvas.toJSON(PAGE_JSON_PROPS)), bg: typeof canvas.backgroundColor === 'string' ? canvas.backgroundColor : '#ffffff' }; }
+const PAGE_JSON_PROPS = ['selectable','evented','name','__locked','__f','__curve','__grad','__anim','__origFont'];
+function capturePage(){ return { json: stripPins(JSON.stringify(canvas.toJSON(PAGE_JSON_PROPS))), bg: typeof canvas.backgroundColor === 'string' ? canvas.backgroundColor : '#ffffff' }; }
 function emptyPage(){ return { json: JSON.stringify({ version: '5.3.0', objects: [], background: '#ffffff' }), bg: '#ffffff' }; }
 function applyPage(p){
   saving = true;
@@ -1631,13 +1647,20 @@ function renderPageStrip(){
 function resetPages(pages, idx){ docPages = pages ? JSON.parse(JSON.stringify(pages)) : null; docPageIdx = idx || 0; renderPageStrip(); }
 
 /* ================= SAVE / LOAD ================= */
+function stripPins(jsonStr){
+  try { const o = JSON.parse(jsonStr); o.objects = (o.objects || []).filter(x => x.name !== '__pin'); return JSON.stringify(o); }
+  catch(e){ return jsonStr; }
+}
 function designSnapshot(){
+  setPinsVisible(false);
   canvas.discardActiveObject(); canvas.renderAll();
   let pages = null;
   if (docPages){ docPages[docPageIdx] = capturePage(); pages = JSON.parse(JSON.stringify(docPages)); }
-  return { pages, pageIndex: docPageIdx, json: JSON.stringify(canvas.toJSON(['selectable','evented','name','__locked','__f','__curve','__grad'])),
+  const snapOut = { pages, pageIndex: docPageIdx, notes: docNotes.slice(), comments: JSON.parse(JSON.stringify(docComments)), json: stripPins(JSON.stringify(canvas.toJSON(['selectable','evented','name','__locked','__f','__curve','__grad','__anim','__origFont']))),
     bg: typeof canvas.backgroundColor === 'string' ? canvas.backgroundColor : '#ffffff',
     thumb: canvas.toDataURL({ format:'jpeg', quality:.6, multiplier: Math.min(300/currentSize.w, 1) }) };
+  setPinsVisible(true);
+  return snapOut;
 }
 function saveDesign(manual){
   if (!canvas) return;
@@ -1646,7 +1669,7 @@ function saveDesign(manual){
   const title = document.getElementById('docTitle').value.trim() || 'Untitled design';
   if (currentDesignId){
     const d = ds.find(x => x.id === currentDesignId);
-    if (d){ Object.assign(d, snap, { name: title, sizeId: currentSize.id, sizeName: currentSize.name, sizeW: currentSize.w, sizeH: currentSize.h, updated: new Date().toLocaleString() }); saveDesigns(ds); }
+    if (d){ pushVersion(d); Object.assign(d, snap, { name: title, sizeId: currentSize.id, sizeName: currentSize.name, sizeW: currentSize.w, sizeH: currentSize.h, updated: new Date().toLocaleString() }); saveDesigns(ds); }
   } else {
     if (!isPro() && ds.filter(x => !x.trashed).length >= 5){ requirePro('Unlimited projects (Free limit: 5)'); return; }
     const rec = { id: Date.now(), name: title, sizeId: currentSize.id, sizeName: currentSize.name, sizeW: currentSize.w, sizeH: currentSize.h, updated: new Date().toLocaleString(), trashed:false, ...snap };
@@ -1664,7 +1687,7 @@ function loadDesign(id){
   canvas.loadFromJSON(d.json, () => {
     canvas.setBackgroundColor(d.bg || '#ffffff', () => {});
     canvas.renderAll(); saving = false; history = []; hIndex = -1; pushHistory(true); renderLayers(); fitZoom();
-    resetPages(d.pages, d.pageIndex || 0);
+    resetPages(d.pages, d.pageIndex || 0); docNotes = d.notes || []; docComments = d.comments || []; rebuildPins();
     currentDesignId = d.id; document.getElementById('docTitle').value = d.name;
     document.getElementById('savedNote').textContent = '✓ Saved';
   });
@@ -1678,7 +1701,7 @@ function parseShareHash(){
 function openShare(){
   if (!canvas) return;
   saveDesign(false);
-  const link = location.origin + location.pathname + '#d=' + btoa(unescape(encodeURIComponent(JSON.stringify(canvas.toJSON(['selectable','evented','name','__locked','__f','__curve','__grad'])))));
+  const link = location.origin + location.pathname + '#d=' + btoa(unescape(encodeURIComponent(JSON.stringify(canvas.toJSON(['selectable','evented','name','__locked','__f','__curve','__grad','__anim','__origFont'])))));
   document.getElementById('shareLink').value = link;
   openModal('shareModal');
 }
@@ -1731,10 +1754,12 @@ document.addEventListener('click', e => {
 document.addEventListener('click', e => { if (!e.target.closest('#view-editor .ed-right')) { const m = document.getElementById('exportMenu'); if (m) m.style.display = 'none'; } });
 function downloadURI(uri, name){ const a = document.createElement('a'); a.href = uri; a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
 function withWatermark(fn){
+  setPinsVisible(false);
   canvas.discardActiveObject(); let wm = null;
   if (!isPro()){ wm = new fabric.Text('Made with Kanva', { left: currentSize.w - 8, top: currentSize.h - 8, fontSize: Math.max(13, currentSize.w*.016), fill:'rgba(0,0,0,.45)', fontFamily:'Inter', originX:'right', originY:'bottom', selectable:false, evented:false, name:'__wm' }); canvas.add(wm); }
   canvas.renderAll(); fn();
   if (wm){ canvas.remove(wm); canvas.renderAll(); }
+  setPinsVisible(true);
   document.getElementById('exportMenu').style.display = 'none';
 }
 function exportPNG(mult){ if (mult > 1 && !isPro()){ requirePro('HD export'); return; } withWatermark(() => downloadURI(canvas.toDataURL({ format:'png', multiplier: mult }), 'kanva-design.png')); toast('⬇️ PNG downloaded' + (mult > 1 ? ' (HD)' : '')); }
@@ -1783,6 +1808,374 @@ async function resizeCopy(){
   ds.unshift(rec); saveDesigns(ds);
   toast('📐 Copy tayyar hai — ' + sz.name + ' mein khul rahi hai');
   loadDesign(rec.id);
+}
+/* ================= ANIMATIONS ================= */
+const ANIM_TYPES = { fade: 'Fade in', rise: 'Rise up', pop: 'Pop', left: 'Slide left', right: 'Slide right', spin: 'Spin in' };
+let docNotes = [];
+function setAnim(v){
+  const o = active(); if (!o) return;
+  o.__anim = v ? { type: v, dur: 0.7 } : null;
+  const pa2 = document.getElementById('pAnim'); if (pa2) pa2.value = v || '';
+  canvas.renderAll(); pushHistory(); markUnsaved();
+  toast(v ? '🎬 Animation lag gayi: ' + ANIM_TYPES[v] : 'Animation hata di');
+}
+function animRest(o){ return { left: o.left, top: o.top, scaleX: o.scaleX, scaleY: o.scaleY, opacity: o.opacity, angle: o.angle }; }
+function applyAnimAt(objs, t){
+  objs.forEach((o, i) => {
+    const rest = o.__rest; if (!rest) return;
+    if (!o.__anim){ o.set(rest); o.setCoords(); return; }
+    const delay = i * 0.12, dur = o.__anim.dur || 0.7;
+    let p = (t - delay) / dur; p = Math.max(0, Math.min(1, p));
+    const e = 1 - Math.pow(1 - p, 3);
+    const st = { left: rest.left, top: rest.top, scaleX: rest.scaleX, scaleY: rest.scaleY, opacity: rest.opacity, angle: rest.angle };
+    if (p < 1){
+      const ty = o.__anim.type;
+      if (ty === 'fade') st.opacity = rest.opacity * e;
+      if (ty === 'rise'){ st.top = rest.top + 46 * (1 - e); st.opacity = rest.opacity * e; }
+      if (ty === 'pop'){ st.scaleX = rest.scaleX * (0.4 + 0.6 * e); st.scaleY = rest.scaleY * (0.4 + 0.6 * e); st.opacity = rest.opacity * Math.min(1, e * 1.6); }
+      if (ty === 'left'){ st.left = rest.left - 70 * (1 - e); st.opacity = rest.opacity * e; }
+      if (ty === 'right'){ st.left = rest.left + 70 * (1 - e); st.opacity = rest.opacity * e; }
+      if (ty === 'spin'){ st.angle = rest.angle - 50 * (1 - e); st.scaleX = rest.scaleX * (0.6 + 0.4 * e); st.scaleY = rest.scaleY * (0.6 + 0.4 * e); st.opacity = rest.opacity * e; }
+    }
+    o.set(st); o.setCoords();
+  });
+  canvas.renderAll();
+}
+function animTimeline(){
+  const objs = canvas.getObjects().filter(o => o.name !== '__bg' && o.name !== '__wm' && o.name !== '__pin');
+  objs.forEach(o => { o.__rest = animRest(o); });
+  const ends = objs.map((o, i) => o.__anim ? i * 0.12 + (o.__anim.dur || 0.7) : 0);
+  const total = Math.min(4.2, Math.max(1.4, (ends.length ? Math.max(...ends) : 0) + 0.9));
+  return { objs, total };
+}
+function restoreAnim(objs){ objs.forEach(o => { if (o.__rest){ o.set(o.__rest); o.setCoords(); } delete o.__rest; }); canvas.renderAll(); }
+let animPlaying = false;
+function playAnimations(){
+  if (animPlaying || !canvas) return;
+  const tl = animTimeline();
+  if (!tl.objs.some(o => o.__anim)){ toast('ℹ️ Pehle kisi element ko select karke use Animation dein (upar wali bar mein 🎬)'); tl.objs.forEach(o => delete o.__rest); return; }
+  animPlaying = true;
+  canvas.discardActiveObject(); canvas.renderAll();
+  const t0 = performance.now();
+  const step = () => {
+    const t = (performance.now() - t0) / 1000;
+    if (t >= tl.total){ restoreAnim(tl.objs); animPlaying = false; return; }
+    applyAnimAt(tl.objs, t);
+    requestAnimationFrame(step);
+  };
+  step();
+}
+/* ---- GIF export (gif.js, worker blob se) ---- */
+let GIF_WORKER_URL = null;
+function prepGifWorker(){
+  if (GIF_WORKER_URL) return Promise.resolve(GIF_WORKER_URL);
+  return fetch('https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js').then(r => r.text()).then(txt => {
+    GIF_WORKER_URL = URL.createObjectURL(new Blob([txt], { type: 'application/javascript' }));
+    return GIF_WORKER_URL;
+  });
+}
+function exportGIF(){
+  if (typeof GIF === 'undefined'){ toast('⚠️ GIF library load nahi hui — internet check karke dobara try karein'); return; }
+  const tl = animTimeline();
+  if (!tl.objs.some(o => o.__anim)){ toast('ℹ️ GIF ke liye pehle elements ko animation dein'); tl.objs.forEach(o => delete o.__rest); return; }
+  toast('🎞️ GIF ban raha hai — chand seconds sabr karein…');
+  prepGifWorker().then(() => {
+    const sc = Math.min(640 / currentSize.w, 1);
+    const W = Math.round(currentSize.w * sc), H = Math.round(currentSize.h * sc);
+    const gif = new GIF({ workers: 2, quality: 12, width: W, height: H, workerScript: GIF_WORKER_URL });
+    const tmp = document.createElement('canvas'); tmp.width = W; tmp.height = H;
+    const tg = tmp.getContext('2d');
+    canvas.discardActiveObject(); setPinsVisible(false);
+    const fps = 12, frames = Math.round(tl.total * fps);
+    for (let i = 0; i <= frames; i++){
+      applyAnimAt(tl.objs, i / fps);
+      tg.clearRect(0, 0, W, H);
+      tg.drawImage(canvas.lowerCanvasEl, 0, 0, W, H);
+      gif.addFrame(tmp, { copy: true, delay: Math.round(1000 / fps) });
+    }
+    restoreAnim(tl.objs); setPinsVisible(true);
+    gif.on('finished', blob => { downloadURI(URL.createObjectURL(blob), 'kanva-animation.gif'); toast('⬇️ GIF downloaded'); });
+    gif.render();
+  }).catch(() => { restoreAnim(tl.objs); toast('⚠️ GIF nahi bana — internet check karke dobara try karein'); });
+}
+/* ---- Video export (MediaRecorder) ---- */
+function exportVideo(){
+  const tl = animTimeline();
+  if (!tl.objs.some(o => o.__anim)){ toast('ℹ️ Video ke liye pehle elements ko animation dein'); tl.objs.forEach(o => delete o.__rest); return; }
+  const mime = ['video/mp4', 'video/webm;codecs=vp9', 'video/webm'].find(m => { try { return window.MediaRecorder && MediaRecorder.isTypeSupported(m); } catch(e){ return false; } });
+  if (!mime){ toast('⚠️ Is browser mein video recording support nahi hai'); tl.objs.forEach(o => delete o.__rest); return; }
+  toast('🎥 Video record ho raha hai…');
+  canvas.discardActiveObject(); setPinsVisible(false); canvas.renderAll();
+  const stream = canvas.lowerCanvasEl.captureStream(30);
+  const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 5000000 });
+  const chunks = [];
+  rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+  rec.onstop = () => {
+    restoreAnim(tl.objs); setPinsVisible(true);
+    const blob = new Blob(chunks, { type: mime.split(';')[0] });
+    downloadURI(URL.createObjectURL(blob), mime.startsWith('video/mp4') ? 'kanva-video.mp4' : 'kanva-video.webm');
+    toast('⬇️ Video downloaded');
+  };
+  rec.start(200);
+  const t0 = performance.now();
+  const step = () => {
+    const t = (performance.now() - t0) / 1000;
+    if (t >= tl.total){ rec.stop(); return; }
+    applyAnimAt(tl.objs, t);
+    requestAnimationFrame(step);
+  };
+  step();
+}
+/* ================= PRESENTATION ================= */
+let presentState = { slides: [], idx: 0, timer: null, secs: 0 };
+function renderSlideImage(p){
+  return new Promise(res => {
+    const tc = new fabric.StaticCanvas(null, { width: currentSize.w, height: currentSize.h });
+    tc.loadFromJSON(p.json, () => {
+      tc.setBackgroundColor(p.bg || '#ffffff', () => {});
+      tc.renderAll();
+      const url = tc.toDataURL({ format: 'jpeg', quality: .8, multiplier: Math.min(1100 / currentSize.w, 1) });
+      try { tc.dispose(); } catch(e){}
+      res(url);
+    });
+  });
+}
+async function openPresent(){
+  if (!canvas) return;
+  ensurePages();
+  docPages[docPageIdx] = capturePage();
+  toast('🖥️ Presentation tayyar ho raha hai…');
+  const slides = [];
+  for (const p of docPages) slides.push(await renderSlideImage(p));
+  presentState = { slides, idx: 0, timer: null, secs: 0 };
+  const ov = document.getElementById('presentOverlay');
+  if (!ov) return;
+  ov.style.display = 'flex';
+  showSlide(0);
+  const tel = document.getElementById('presentTimer'); if (tel) tel.textContent = '00:00';
+  presentState.timer = setInterval(() => {
+    presentState.secs++;
+    const el = document.getElementById('presentTimer');
+    if (el) el.textContent = String(Math.floor(presentState.secs / 60)).padStart(2, '0') + ':' + String(presentState.secs % 60).padStart(2, '0');
+  }, 1000);
+  if (ov.requestFullscreen){ try { ov.requestFullscreen(); } catch(e){} }
+}
+function showSlide(i){
+  const n = presentState.slides.length; if (!n) return;
+  presentState.idx = Math.max(0, Math.min(n - 1, i));
+  const img = document.getElementById('presentImg'); if (img) img.src = presentState.slides[presentState.idx];
+  const c = document.getElementById('presentCount'); if (c) c.textContent = (presentState.idx + 1) + ' / ' + n;
+  const nt = document.getElementById('presentNote'); if (nt) nt.textContent = docNotes[presentState.idx] || '';
+  const ov = document.getElementById('presentOverlay');
+  if (ov){ ov.classList.remove('slide-anim'); void ov.offsetWidth; ov.classList.add('slide-anim'); }
+}
+function presentNav(d){ showSlide(presentState.idx + d); }
+function editSlideNote(){
+  const v = prompt('Is slide ke liye presenter note:', docNotes[presentState.idx] || '');
+  if (v === null) return;
+  docNotes[presentState.idx] = v.trim();
+  showSlide(presentState.idx); markUnsaved();
+  toast('📝 Note save ho gaya — design ke sath hi save hoga');
+}
+function closePresent(){
+  if (presentState.timer) clearInterval(presentState.timer);
+  const ov = document.getElementById('presentOverlay'); if (ov) ov.style.display = 'none';
+  if (document.fullscreenElement){ try { document.exitFullscreen(); } catch(e){} }
+}
+document.addEventListener('keydown', e => {
+  const ov = document.getElementById('presentOverlay');
+  if (ov && ov.style.display !== 'none'){
+    if (e.key === 'Escape') closePresent();
+    if (e.key === 'ArrowRight' || e.key === ' '){ e.preventDefault(); presentNav(1); }
+    if (e.key === 'ArrowLeft') presentNav(-1);
+  }
+});
+/* ---- Text combinations ---- */
+function addCombo(kind){
+  const W = currentSize.w;
+  if (kind === 'sale'){
+    addAt(T('BIG SALE', { fontFamily: 'Bebas Neue', fontSize: W * .13, fill: '#0d1216', fontWeight: 700, width: W * .9 }), .5, .3);
+    addAt(T('Up to 50% off — this week only', { fontFamily: 'Inter', fontSize: W * .032, fill: '#555c66', width: W * .8 }), .5, .47);
+    pill('SHOP NOW', .5, .58, .4, '#8b3dff', '#ffffff', .03);
+  }
+  if (kind === 'quote'){
+    addAt(T('“', { fontFamily: 'Playfair Display', fontSize: W * .22, fill: '#8b3dff', width: W * .4 }), .5, .16);
+    addAt(T('Your quote goes here — make it count.', { fontFamily: 'Playfair Display', fontSize: W * .058, fill: '#0d1216', fontWeight: 700, width: W * .82, lineHeight: 1.25 }), .5, .38);
+    addAt(T('— AUTHOR NAME', { fontFamily: 'Montserrat', fontSize: W * .024, fill: '#8b3dff', charSpacing: 160, width: W * .6 }), .5, .66);
+  }
+  if (kind === 'product'){
+    pill('NEW ARRIVAL', .5, .24, .34, '#ec4899', '#ffffff', .026);
+    addAt(T('Product Name', { fontFamily: 'Poppins', fontSize: W * .085, fill: '#0d1216', fontWeight: 800, width: W * .9 }), .5, .36);
+    addAt(T('A short line that sells the benefit, not the feature.', { fontFamily: 'Inter', fontSize: W * .03, fill: '#555c66', width: W * .78, lineHeight: 1.4 }), .5, .54);
+  }
+  if (kind === 'event'){
+    addAt(T('YOU ARE INVITED', { fontFamily: 'Montserrat', fontSize: W * .027, fill: '#8b3dff', fontWeight: 700, charSpacing: 220, width: W * .72 }), .5, .26);
+    addAt(T('Grand Opening', { fontFamily: 'Playfair Display', fontSize: W * .1, fill: '#0d1216', fontWeight: 700, width: W * .92 }), .5, .36);
+    addAt(T('Saturday · 10 AM · Main Bazaar Road', { fontFamily: 'Inter', fontSize: W * .03, fill: '#555c66', width: W * .8 }), .5, .55);
+    pill('JOIN US', .5, .66, .34, '#8b3dff', '#ffffff', .028);
+  }
+  toast('✨ Text combination lag gayi — har hisa alag edit ho sakta hai');
+}
+/* ================= COMMENTS (canvas pins) ================= */
+let docComments = [];
+let commentMode = false;
+function toggleCommentMode(){
+  commentMode = !commentMode;
+  const b = document.getElementById('commentBtn');
+  if (b){ b.style.background = commentMode ? '#efe9ff' : ''; b.style.borderColor = commentMode ? '#8b3dff' : ''; }
+  toast(commentMode ? '💬 Comment mode ON — canvas par tap karke pin lagayein' : 'Comment mode OFF');
+}
+function rebuildPins(){
+  if (!canvas) return;
+  canvas.getObjects().filter(o => o.name === '__pin').forEach(o => canvas.remove(o));
+  docComments.forEach((c, i) => {
+    if (c.resolved) return;
+    const label = String(i + 1);
+    const pin = new fabric.Group([
+      new fabric.Circle({ radius: 17, fill: '#8b3dff', stroke: '#ffffff', strokeWidth: 3, left: 0, top: 0 }),
+      new fabric.Text(label, { fontSize: 19, fill: '#ffffff', fontFamily: 'Poppins', fontWeight: 700, left: label.length > 1 ? 8 : 12, top: 6 })
+    ], { left: currentSize.w * c.x, top: currentSize.h * c.y, originX: 'center', originY: 'center', name: '__pin', selectable: false, evented: false, hoverCursor: 'default' });
+    canvas.add(pin);
+  });
+  canvas.renderAll(); renderComments();
+}
+function renderComments(){
+  const el = document.getElementById('commentList'); if (!el) return;
+  if (!docComments.length){ el.innerHTML = '<p class="muted small">No comments yet. "Add comments" ON karke canvas par tap karein.</p>'; return; }
+  el.innerHTML = docComments.map((c, i) => `<div class="comment-item ${c.resolved ? 'resolved' : ''}"><b>${i + 1}. ${escapeHtml(c.by)}</b><span>${escapeHtml(c.text)}</span><div class="c-btns">${c.resolved ? '<em>✓ Resolved</em>' : `<button onclick="resolveComment(${i})">✓ Resolve</button>`}<button class="danger" onclick="deleteComment(${i})">Delete</button></div></div>`).join('');
+}
+function resolveComment(i){ docComments[i].resolved = true; rebuildPins(); markUnsaved(); }
+function deleteComment(i){ if (!confirm('Ye comment delete karein?')) return; docComments.splice(i, 1); rebuildPins(); markUnsaved(); }
+/* ================= VERSION HISTORY ================= */
+function pushVersion(d){
+  if (!d || !d.json) return;
+  const snap = { ts: Date.now(), json: d.json, bg: d.bg, pages: d.pages || null, pageIndex: d.pageIndex || 0 };
+  d.versions = d.versions || [];
+  if (d.versions[0] && d.versions[0].json === snap.json) return;
+  d.versions.unshift(snap);
+  if (d.versions.length > 5) d.versions.length = 5;
+}
+function openVersions(){
+  const ov = document.getElementById('versionOverlay'); if (!ov) return;
+  ov.style.display = 'flex';
+  const el = document.getElementById('versionList'); if (!el) return;
+  const d = getDesigns().find(x => x.id === currentDesignId);
+  if (!d || !(d.versions || []).length){ el.innerHTML = '<p class="muted">Abhi koi purani version nahi hai — jab aap Save karte hain, purani halat yahan mehfooz ho jati hai.</p>'; return; }
+  el.innerHTML = d.versions.map((v, i) => `<div class="version-item"><span>🕐 ${new Date(v.ts).toLocaleString()}</span><button class="btn small-btn" onclick="restoreVersion(${i})">Restore</button></div>`).join('');
+}
+function closeVersions(){ const ov = document.getElementById('versionOverlay'); if (ov) ov.style.display = 'none'; }
+function restoreVersion(i){
+  const d = getDesigns().find(x => x.id === currentDesignId); if (!d) return;
+  const v = (d.versions || [])[i]; if (!v) return;
+  if (!confirm('Ye purani version wapas layein? Maujooda halat badal jayegi — lekin Save karne par wo bhi versions mein mehfooz rahegi.')) return;
+  closeVersions();
+  saving = true;
+  canvas.loadFromJSON(v.json, () => {
+    canvas.setBackgroundColor(v.bg || '#ffffff', () => {});
+    resetPages(v.pages, v.pageIndex || 0); docComments = d.comments || []; rebuildPins();
+    canvas.renderAll(); saving = false; history = []; hIndex = -1; pushHistory(true); renderLayers(); syncProps();
+    markUnsaved(); toast('🕐 Purani version wapas aa gayi — pasand aye to Save kar lein');
+  });
+}
+/* ================= SVG EXPORT ================= */
+function exportSVG(){
+  if (!canvas) return;
+  canvas.discardActiveObject(); setPinsVisible(false); canvas.renderAll();
+  const svg = canvas.toSVG();
+  setPinsVisible(true);
+  downloadURI(URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' })), 'kanva-design.svg');
+  toast('⬇️ SVG downloaded');
+}
+/* ================= AI TOOLS ================= */
+let aiQuota = { day: '', img: 0, write: 0 };
+function loadAiQuota(){ try { const q = JSON.parse(localStorage.getItem('kv_ai_quota') || 'null'); const today = new Date().toDateString(); if (q && q.day === today) aiQuota = q; else aiQuota = { day: today, img: 0, write: 0 }; } catch(e){ aiQuota = { day: new Date().toDateString(), img: 0, write: 0 }; } }
+function saveAiQuota(){ try { localStorage.setItem('kv_ai_quota', JSON.stringify(aiQuota)); } catch(e){} }
+function quotaLeft(kind){ const lim = isPro() ? 30 : (kind === 'img' ? 3 : 5); return lim - (aiQuota[kind] || 0); }
+loadAiQuota();
+async function removeBg(){
+  const o = active();
+  if (!o || o.type !== 'image'){ toast('⚠️ Pehle ek photo select karein'); return; }
+  if (!isPro()){ requirePro('Background Remover (AI)'); return; }
+  toast('🤖 Background remove ho raha hai — pehli dafa library download hogi, thora waqt lagega…');
+  try {
+    const mod = await import('https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.5.5/+esm');
+    const blob = await mod.removeBackground(o.getSrc(), { output: { format: 'image/png', quality: 1 } });
+    const url = URL.createObjectURL(blob);
+    fabric.Image.fromURL(url, img => {
+      img.set({ left: o.left, top: o.top, scaleX: o.scaleX, scaleY: o.scaleY, angle: o.angle, name: o.name || 'Photo' });
+      const idx = canvas.getObjects().indexOf(o);
+      canvas.remove(o);
+      if (idx >= 0) canvas.insertAt(img, idx); else canvas.add(img);
+      canvas.setActiveObject(img); canvas.renderAll(); pushHistory(); markUnsaved();
+      toast('✅ Background remove ho gaya');
+    });
+  } catch(e){ toast('⚠️ Background remove nahi hua — internet check karke dobara try karein'); }
+}
+async function generateAiImage(){
+  const inp = document.getElementById('aiPrompt');
+  const prompt2 = ((inp && inp.value) || '').trim();
+  if (!prompt2){ toast('⚠️ Pehle likhein ke kaisi photo chahiye'); return; }
+  if (quotaLeft('img') <= 0){ toast(isPro() ? '⚠️ Aaj ki AI photo quota khatam (30/day)' : '⚠️ Free AI quota khatam (3/day) — Pro mein roz 30 milte hain'); return; }
+  toast('🤖 AI photo ban raha hai — 10-30 seconds sabr karein…');
+  try {
+    const seed = Math.floor(Math.random() * 999999);
+    const r = await fetch('https://image.pollinations.ai/prompt/' + encodeURIComponent(prompt2) + '?width=1024&height=1024&seed=' + seed + '&nologo=true');
+    if (!r.ok) throw new Error('fetch fail');
+    const b = await r.blob();
+    const rd = new FileReader();
+    rd.onload = () => { aiQuota.img++; saveAiQuota(); addImageURL(rd.result); toast('✅ AI photo lag gayi — aaj ke baqi: ' + quotaLeft('img')); };
+    rd.readAsDataURL(b);
+  } catch(e){ toast('⚠️ AI photo nahi bana — internet/service check karke dobara try karein'); }
+}
+async function magicWrite(){
+  const topic = ((document.getElementById('mwTopic') || {}).value || '').trim();
+  if (!topic){ toast('⚠️ Topic likhein — jaise: biryani offer, school admissions'); return; }
+  if (quotaLeft('write') <= 0){ toast('⚠️ Aaj ki writing quota khatam — kal dobara try karein ya Pro lein'); return; }
+  const kind = document.getElementById('mwKind').value;
+  const lang = document.getElementById('mwLang').value;
+  const ask = kind === 'headline' ? 'Write ONE short catchy advertising headline (max 8 words)' : kind === 'caption' ? 'Write a short social media caption with 3 hashtags (max 30 words)' : 'Write a one-line special offer announcement (max 12 words)';
+  const langAsk = lang === 'urdu' ? ' in Roman Urdu (Urdu language written in English letters)' : ' in English';
+  toast('✍️ AI likh raha hai…');
+  try {
+    const r = await fetch('https://text.pollinations.ai/' + encodeURIComponent(ask + langAsk + ' for: ' + topic));
+    if (!r.ok) throw new Error('fail');
+    let txt = (await r.text()).trim();
+    if (!txt) throw new Error('empty');
+    txt = txt.split('\n')[0].slice(0, 140);
+    aiQuota.write++; saveAiQuota();
+    addStyledText(txt, 'Poppins', Math.round(currentSize.w * .055), '#0d1216', 800);
+    toast('✅ Text lag gaya — aaj ke baqi: ' + quotaLeft('write'));
+  } catch(e){ toast('⚠️ AI likh nahi paya — dobara try karein'); }
+}
+async function translateDesign(){
+  const dir = prompt('Design ke tamam texts translate karein:\n1 = English → Urdu\n2 = Urdu → English\n\nNumber likhein:', '1');
+  if (!dir) return;
+  const toUrdu = dir.trim() !== '2';
+  const pair = toUrdu ? 'en|ur' : 'ur|en';
+  const texts = canvas.getObjects().filter(o => ['textbox', 'i-text', 'text'].includes(o.type) && o.text && o.text.trim());
+  if (!texts.length){ toast('⚠️ Is design mein koi text nahi hai'); return; }
+  toast('🌐 Translate ho raha hai — ' + texts.length + ' texts…');
+  let done = 0, failed = 0;
+  for (const o of texts){
+    try {
+      const r = await fetch('https://api.mymemory.translated.net/get?q=' + encodeURIComponent(o.text.slice(0, 450)) + '&langpair=' + pair);
+      const j = await r.json();
+      const out = j && j.responseData && j.responseData.translatedText;
+      if (out){
+        if (toUrdu){ if (!o.__origFont) o.__origFont = o.fontFamily; o.set({ text: out, fontFamily: 'Noto Nastaliq Urdu', lineHeight: 1.9 }); }
+        else o.set({ text: out, fontFamily: o.__origFont || 'Poppins', lineHeight: 1.25 });
+        done++;
+      } else failed++;
+    } catch(e){ failed++; }
+  }
+  canvas.renderAll(); pushHistory(); markUnsaved();
+  toast('🌐 Translate mukammal: ' + done + ' ho gaye' + (failed ? ', ' + failed + ' nahi hue (rozana limit)' : ''));
+}
+
+function setPinsVisible(v){
+  if (!canvas) return;
+  canvas.getObjects().forEach(o => { if (o.name === '__pin') o.visible = v; });
+  canvas.renderAll();
 }
 function exportTransparent(){
   const prevBg = canvas.backgroundColor;
@@ -2166,7 +2559,11 @@ TEMPLATES.push(
   { id:'restaurant',title:'Restaurant Promo',   sub:'Dine-in offer',         cat:'Food',      pro:true,  size:'ig-post',  bg:['#1c0a00','#000000'] },
   { id:'biryani',   title:'Biryani Special',    sub:'Food deal of the day',  cat:'Food',      pro:false, size:'ig-post',  bg:['#7c2d12','#431407'] },
   { id:'mehndi',    title:'Mehndi Night',       sub:'Mehndi celebration',    cat:'Events',    pro:true,  size:'ig-story', bg:['#a16207','#713f12'] },
-  { id:'bdaybash',  title:'Birthday Party',     sub:'Kids birthday invite',  cat:'Social Media', pro:false, size:'ig-post', bg:['#ec4899','#8b3dff'] }
+  { id:'bdaybash',  title:'Birthday Party',     sub:'Kids birthday invite',  cat:'Social Media', pro:false, size:'ig-post', bg:['#ec4899','#8b3dff'] },
+  { id:'mockphone', title:'Phone Mockup',     sub:'Design phone frame mein',  cat:'Mockups', pro:false, size:'ig-post', bg:['#111827','#1f2937'] },
+  { id:'mockshirt', title:'T-Shirt Mockup',   sub:'Shirt par design preview', cat:'Mockups', pro:false, size:'ig-post', bg:['#f1f5f9','#e2e8f0'] },
+  { id:'mockmug',    title:'Mug Mockup',      sub:'Mug par design preview',   cat:'Mockups', pro:true,  size:'ig-post', bg:['#fef3c7','#fde68a'] },
+  { id:'mockshop',   title:'Shop Signboard',  sub:'Dukaan ka board mockup',   cat:'Mockups', pro:true,  size:'fb-post', bg:['#0ea5e9','#0369a1'] }
 );
 Object.assign(BUILDERS, {
   walima(){ gradRect('#7f1d1d','#450a0a'); const W = currentSize.w;
@@ -2263,6 +2660,29 @@ Object.assign(BUILDERS, {
     addAt(T('Dholki · Dance · Dinner — wear something green & yellow!', { fontFamily:'Inter', fontSize:W*.029, fill:'#fef3c7', width:W*.82, lineHeight:1.5 }), .5, .58);
     pill('FRIDAY · 7 PM ONWARDS', .5, .72, .54, '#16a34a', '#ffffff', .027);
     addAt(T('At the bride’s home — family & friends welcome', { fontFamily:'Inter', fontSize:W*.025, fill:'rgba(255,255,255,.7)', width:W*.75 }), .5, .86); },
+  mockphone(){ solidBg('#111827'); deco(.08,.06,.07,'#8b3dff',.35); deco(.94,.9,.09,'#00c4cc',.25);
+    canvas.add(new fabric.Rect({ left: currentSize.w*.23, top: currentSize.h*.06, width: currentSize.w*.54, height: currentSize.h*.82, rx: 48, ry: 48, fill: '#000000', stroke: '#4b5563', strokeWidth: 4 }));
+    canvas.add(new fabric.Rect({ left: currentSize.w*.255, top: currentSize.h*.085, width: currentSize.w*.49, height: currentSize.h*.72, fill: '#e8e4f2', stroke: '#8b3dff', strokeWidth: 3, strokeDashArray: [10,7], name: 'Photo Frame' }));
+    canvas.add(new fabric.Rect({ left: currentSize.w*.44, top: currentSize.h*.075, width: currentSize.w*.12, height: currentSize.h*.016, rx: 8, ry: 8, fill: '#000000' }));
+    addAt(T('YOUR DESIGN HERE', { fontFamily:'Montserrat', fontSize: currentSize.w*.03, fill:'#e5e7eb', fontWeight:700, charSpacing: 200, width: currentSize.w*.8 }), .5, .93); },
+  mockshirt(){ solidBg('#f1f5f9');
+    const shirt = new fabric.Path('M 30 12 L 46 4 Q 50 10 54 4 L 70 12 L 80 26 L 67 32 L 67 94 L 33 94 L 33 32 L 20 26 Z', { left: currentSize.w*.14, top: currentSize.h*.08, fill: '#ffffff', stroke: '#cbd5e1', strokeWidth: 2 });
+    shirt.scaleToWidth(currentSize.w*.72); canvas.add(shirt);
+    canvas.add(new fabric.Rect({ left: currentSize.w*.36, top: currentSize.h*.34, width: currentSize.w*.28, height: currentSize.h*.28, fill: '#e8e4f2', stroke: '#8b3dff', strokeWidth: 3, strokeDashArray: [10,7], name: 'Photo Frame' }));
+    addAt(T('T-SHIRT MOCKUP', { fontFamily:'Montserrat', fontSize: currentSize.w*.032, fill:'#334155', fontWeight:700, charSpacing: 160, width: currentSize.w*.8 }), .5, .94); },
+  mockmug(){ solidBg('#fef3c7'); deco(.12,.12,.06,'#f59e0b',.5); deco(.9,.8,.08,'#f59e0b',.35);
+    canvas.add(new fabric.Ellipse({ left: currentSize.w*.18, top: currentSize.h*.78, rx: currentSize.w*.32, ry: currentSize.h*.045, fill: '#e7d8ac' }));
+    canvas.add(new fabric.Circle({ left: currentSize.w*.63, top: currentSize.h*.36, radius: currentSize.w*.115, fill: 'transparent', stroke: '#ffffff', strokeWidth: currentSize.w*.045 }));
+    canvas.add(new fabric.Rect({ left: currentSize.w*.22, top: currentSize.h*.26, width: currentSize.w*.44, height: currentSize.h*.54, rx: 26, ry: 26, fill: '#ffffff', stroke: '#e5e0cd', strokeWidth: 2 }));
+    canvas.add(new fabric.Rect({ left: currentSize.w*.295, top: currentSize.h*.36, width: currentSize.w*.29, height: currentSize.h*.3, fill: '#e8e4f2', stroke: '#8b3dff', strokeWidth: 3, strokeDashArray: [10,7], name: 'Photo Frame' }));
+    addAt(T('MUG MOCKUP', { fontFamily:'Montserrat', fontSize: currentSize.w*.032, fill:'#92400e', fontWeight:700, charSpacing: 160, width: currentSize.w*.8 }), .5, .92); },
+  mockshop(){ gradRect('#0ea5e9','#0369a1');
+    canvas.add(new fabric.Rect({ left: currentSize.w*.06, top: currentSize.h*.1, width: currentSize.w*.88, height: currentSize.h*.5, fill: '#ffffff', stroke: '#facc15', strokeWidth: 8 }));
+    canvas.add(new fabric.Rect({ left: currentSize.w*.1, top: currentSize.h*.15, width: currentSize.w*.8, height: currentSize.h*.4, fill: '#e8e4f2', stroke: '#8b3dff', strokeWidth: 3, strokeDashArray: [10,7], name: 'Photo Frame' }));
+    for (let i = 0; i < 8; i++) canvas.add(new fabric.Rect({ left: currentSize.w*(.06 + i*.11), top: currentSize.h*.62, width: currentSize.w*.11, height: currentSize.h*.09, fill: i % 2 ? '#ef4444' : '#ffffff' }));
+    canvas.add(new fabric.Rect({ left: currentSize.w*.2, top: currentSize.h*.71, width: currentSize.w*.045, height: currentSize.h*.24, fill: '#334155' }));
+    canvas.add(new fabric.Rect({ left: currentSize.w*.755, top: currentSize.h*.71, width: currentSize.w*.045, height: currentSize.h*.24, fill: '#334155' }));
+    addAt(T('APNI DUKAAN KA BOARD', { fontFamily:'Poppins', fontSize: currentSize.w*.026, fill:'#ffffff', fontWeight:700, charSpacing: 140, width: currentSize.w*.86 }), .5, .05); },
   bdaybash(){ gradRect('#ec4899','#8b3dff'); const W = currentSize.w;
     deco(.07, .06, .055, '#fde047', .6); deco(.93, .08, .07, '#22d3ee', .5); deco(.88, .78, .05, '#fde047', .55); deco(.06, .8, .065, '#ffffff', .3); deco(.5, .04, .035, '#ffffff', .4);
     addAt(T('HAPPY BIRTHDAY', { fontFamily:'Bebas Neue', fontSize:W*.125, fill:'#ffffff', fontWeight:700, width:W*.94 }), .5, .14);
