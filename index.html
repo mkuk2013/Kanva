@@ -9,7 +9,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="kanva-logo.png">
 <link rel="apple-touch-icon" href="Kanva icon 192.png">
-<link rel="stylesheet" href="style.css?v=19">
+<link rel="stylesheet" href="style.css?v=20">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700&family=Bebas+Neue&family=Pacifico&family=Montserrat:wght@500;700;900&family=Roboto:wght@400;700&family=Oswald:wght@500;700&family=Dancing+Script:wght@700&family=Anton&family=Lobster&family=Noto+Nastaliq+Urdu:wght@400;700&display=swap" rel="stylesheet">
 </head>
@@ -158,6 +158,7 @@
     <!-- PAGE: PROJECTS -->
     <section class="page" id="page-projects" style="display:none">
       <div class="sec-head"><h2>Your projects</h2><button class="btn btn-primary" onclick="openEditor()">＋ New design</button></div>
+      <div class="folder-chips" id="folderChips"></div>
       <div class="design-grid" id="projectGrid"></div>
       <h3 class="sub-h">🧾 My Pro orders</h3>
       <div id="orderList"></div>
@@ -285,6 +286,7 @@
         </div>
       </div>
       <button class="ed-menu" onclick="openResize()">Resize <span id="curSizeLbl"></span></button>
+      <button class="ed-menu" onclick="resizeCopy()">Resize copy</button>
       <span class="ed-sep"></span>
       <button class="ed-icon" onclick="undo()" title="Undo">↩</button>
       <button class="ed-icon" onclick="redo()" title="Redo">↪</button>
@@ -303,6 +305,7 @@
         <button onclick="exportPNG(3)"><img class="cm-ic" data-ic="photos" alt="">PNG — HD ⚡ Pro</button>
         <button onclick="exportJPG()"><img class="cm-ic" data-ic="photos" alt="">JPG</button>
         <button onclick="exportPDF()"><img class="cm-ic" data-ic="poster" alt="">PDF</button>
+        <button onclick="exportPrintPDF()"><img class="cm-ic" data-ic="poster" alt="">Print PDF — crop marks</button>
       </div>
     </div>
   </div>
@@ -362,6 +365,7 @@
     </div>
   </div>
 
+  <div id="pageStrip" class="page-strip" style="display:none"></div>
   <div class="ed-body">
     <div class="rail">
       <button class="rail-btn active" data-tab="templates" onclick="switchTab('templates')"><img class="rail-ic" data-ic="templates" alt=""><span>Templates</span></button>
@@ -383,6 +387,28 @@
         <h4>Shapes</h4><div class="el-grid" id="shapeGrid"></div>
         <h4>Lines & arrows</h4><div class="el-grid" id="lineGrid"></div>
         <h4>Frames & charts</h4><div class="el-grid" id="frameGrid"></div>
+        <h4>Collage frames</h4>
+        <p class="muted small">Frame select karke Photos/Uploads se photo bharein — photo frame mein fit ho jayegi.</p>
+        <div class="collage-btns">
+          <button class="btn btn-ghost" onclick="addCollage(2)">2 photos</button>
+          <button class="btn btn-ghost" onclick="addCollage(3)">3 photos</button>
+          <button class="btn btn-ghost" onclick="addCollage(4)">4 photos</button>
+        </div>
+        <h4>Tables</h4>
+        <div class="mini-form">
+          <label>Rows <input type="number" id="tblRows" min="1" max="10" value="3"></label>
+          <label>Cols <input type="number" id="tblCols" min="1" max="6" value="3"></label>
+          <label>Style <select id="tblStyle"><option value="purple">Purple header</option><option value="plain">Plain</option></select></label>
+          <button class="btn btn-primary btn-block" onclick="addTable()">➕ Add table</button>
+        </div>
+        <h4>Charts</h4>
+        <div class="mini-form">
+          <textarea id="chartData" rows="4" placeholder="Har line: Naam, Value">Sales, 40
+Orders, 65
+Visitors, 90</textarea>
+          <label>Type <select id="chartType"><option value="bar">Bar chart</option><option value="pie">Pie chart</option><option value="donut">Donut chart</option><option value="line">Line chart</option></select></label>
+          <button class="btn btn-primary btn-block" onclick="addChart()">📊 Add chart</button>
+        </div>
         <h4>QR Code</h4>
         <div class="qr-row"><input id="qrText" class="acc-input" placeholder="Link ya text — jaise https://aapki-shop.com"><button class="btn btn-primary btn-block" onclick="addQRCode()">➕ Add QR code</button></div>
         <h4>Stickers</h4><div class="el-grid stickers" id="stickerGrid"></div>
@@ -404,6 +430,9 @@
         <h4>Uploads</h4>
         <label class="btn btn-primary btn-block">📤 Upload files<input type="file" id="uploadInput" accept="image/*" multiple hidden onchange="handleUpload(event)"></label>
         <div class="upload-grid" id="uploadGrid"></div>
+        <h4>Custom fonts</h4>
+        <label class="btn btn-ghost btn-block">🔤 Upload font (.ttf / .otf)<input type="file" accept=".ttf,.otf,.woff,.woff2" hidden onchange="handleFontUpload(event)"></label>
+        <p class="muted small">Apna font is device par save hota hai — phir Text ke fonts mein ajata hai.</p>
         <div id="brandLogoPanel"></div>
       </div>
       <div class="tabpage" id="tab-background" style="display:none">
@@ -477,7 +506,7 @@
 <script src="icons1.js?v=3"></script>
 <script src="icons2.js?v=3"></script>
 <script src="icons3.js?v=3"></script>
-<script src="app.js?v=31"></script>
+<script src="app.js?v=32"></script>
 <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(()=>{}); }</script>
 </body>
 </html>

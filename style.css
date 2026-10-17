@@ -433,3 +433,20 @@ button{cursor:pointer;font-family:inherit}
 .layer-item .lbtn{background:#fff;border:1px solid var(--line);border-radius:7px;padding:2px 6px;font-size:11px;cursor:pointer;line-height:1.2}
 .qr-row input{width:100%;margin-bottom:8px}
 #gradCtx input[type=color]{width:26px;height:26px;padding:0;border:1px solid var(--line);border-radius:6px;background:#fff;vertical-align:middle;cursor:pointer}
+
+
+/* ---- Wave 2: page strip, folder chips, element forms ---- */
+.page-strip{display:flex;align-items:center;gap:6px;padding:6px 10px;background:#fff;border-bottom:1px solid var(--line);overflow-x:auto}
+.page-strip .ps-lbl{font-size:12px;font-weight:700;color:var(--muted);margin-right:2px}
+.ps-btn{min-width:30px;height:30px;padding:0 8px;border:1px solid var(--line);background:#fff;border-radius:8px;font-size:13px;cursor:pointer}
+.ps-btn.active{background:var(--brand);color:#fff;border-color:var(--brand);font-weight:700}
+.ps-btn.add{color:var(--brand);font-weight:800}
+.ps-btn.danger{color:#dc2626}
+.folder-chips{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 14px}
+.mini-form{display:flex;flex-direction:column;gap:8px}
+.mini-form label{font-size:12.5px;font-weight:600;color:var(--muted);display:flex;justify-content:space-between;align-items:center;gap:8px}
+.mini-form input[type=number]{width:70px;padding:6px 8px;border:1px solid var(--line);border-radius:8px}
+.mini-form select{padding:6px 8px;border:1px solid var(--line);border-radius:8px}
+.mini-form textarea{width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:13px;resize:vertical}
+.collage-btns{display:flex;gap:6px}
+.collage-btns .btn{flex:1}
