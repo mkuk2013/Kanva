@@ -9,7 +9,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="kanva-logo.png">
 <link rel="apple-touch-icon" href="Kanva icon 192.png">
-<link rel="stylesheet" href="style.css?v=20">
+<link rel="stylesheet" href="style.css?v=21">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700&family=Bebas+Neue&family=Pacifico&family=Montserrat:wght@500;700;900&family=Roboto:wght@400;700&family=Oswald:wght@500;700&family=Dancing+Script:wght@700&family=Anton&family=Lobster&family=Noto+Nastaliq+Urdu:wght@400;700&display=swap" rel="stylesheet">
 </head>
@@ -282,6 +282,8 @@
           <span class="fm-sep"></span>
           <button onclick="exportPNG(1);hideFileMenu()"><img class="cm-ic" data-ic="photos" alt="">Download PNG</button>
           <button onclick="exportPDF();hideFileMenu()"><img class="cm-ic" data-ic="poster" alt="">Download PDF</button>
+          <button onclick="openVersions();hideFileMenu()"><img class="cm-ic" data-ic="projects" alt="">Version history</button>
+          <button onclick="translateDesign();hideFileMenu()"><img class="cm-ic" data-ic="text" alt="">Translate design (EN ↔ Urdu)</button>
           <button onclick="openShare();hideFileMenu()"><img class="cm-ic" data-ic="share" alt="">Share design</button>
         </div>
       </div>
@@ -296,6 +298,7 @@
     <div class="ed-right">
       <span id="planBadge2" class="plan-badge free">FREE</span>
       <div class="avatar small-av" id="userAvatar3" title="My profile" onclick="showApp();goPage('account')">U</div>
+      <button class="btn btn-white" onclick="openPresent()">▶ Present</button>
       <button class="btn btn-white" onclick="openShare()"><img class="cm-ic" data-ic="share" alt="">Share</button>
       <button class="btn btn-download" onclick="toggleExportMenu()"><img class="cm-ic" data-ic="download" alt="">Download</button>
       <div id="exportMenu" class="export-menu" style="display:none">
@@ -306,6 +309,9 @@
         <button onclick="exportJPG()"><img class="cm-ic" data-ic="photos" alt="">JPG</button>
         <button onclick="exportPDF()"><img class="cm-ic" data-ic="poster" alt="">PDF</button>
         <button onclick="exportPrintPDF()"><img class="cm-ic" data-ic="poster" alt="">Print PDF — crop marks</button>
+        <button onclick="exportSVG()"><img class="cm-ic" data-ic="shapes" alt="">SVG — vector</button>
+        <button onclick="exportGIF()"><img class="cm-ic" data-ic="photos" alt="">GIF — animated</button>
+        <button onclick="exportVideo()"><img class="cm-ic" data-ic="vlog" alt="">Video — MP4 / WebM</button>
       </div>
     </div>
   </div>
@@ -334,6 +340,7 @@
         <button class="ctx-btn" onclick="clearTextBg()" title="Remove highlight">✕</button>
       </span>
       <span id="imgCtx" style="display:none">
+        <button class="ctx-btn" onclick="removeBg()" title="AI se photo ka background remove karein (Pro)">🤖 Remove BG</button>
         <label class="ctx-lbl">☀ <input type="range" id="fBright" min="-60" max="60" value="0" title="Brightness" oninput="setFilter('b', this.value)"></label>
         <label class="ctx-lbl">◐ <input type="range" id="fContrast" min="-60" max="60" value="0" title="Contrast" oninput="setFilter('c', this.value)"></label>
         <label class="ctx-lbl">🎨 <input type="range" id="fSat" min="-100" max="100" value="0" title="Saturation" oninput="setFilter('s', this.value)"></label>
@@ -357,6 +364,9 @@
       <button class="ctx-btn" onclick="groupObjs()">🧩 Group</button>
       <button class="ctx-btn" onclick="ungroupObj()">Ungroup</button>
       <button class="ctx-btn" id="btnLock" onclick="toggleLock()">🔓 Lock</button>
+      <span class="ed-sep"></span>
+      <label class="ctx-lbl">🎬 <select id="pAnim" onchange="setAnim(this.value)" title="Element animation"><option value="">No animation</option><option value="fade">Fade in</option><option value="rise">Rise up</option><option value="pop">Pop</option><option value="left">Slide left</option><option value="right">Slide right</option><option value="spin">Spin in</option></select></label>
+      <button class="ctx-btn" onclick="playAnimations()">▶ Play</button>
       <span class="ed-sep"></span>
       <button class="ctx-btn" onclick="duplicateObj()">⧉ Duplicate</button>
       <button class="ctx-btn" onclick="bringForward()">⬆ Layer</button>
@@ -419,9 +429,23 @@ Visitors, 90</textarea>
         <button class="text-preset big" onclick="addTextPreset('heading')">Add a heading</button>
         <button class="text-preset mid" onclick="addTextPreset('sub')">Add a subheading</button>
         <button class="text-preset small" onclick="addTextPreset('body')">Add body text</button>
+        <h4>✍️ Magic Write (AI)</h4><p class="muted small">Topic likhein, AI headline/caption bana dega. Free: 5/day · Pro: 30/day.</p>
+        <input id="mwTopic" placeholder="e.g. biryani offer, school admissions">
+        <div class="row2"><select id="mwKind"><option value="headline">Headline</option><option value="caption">Caption</option><option value="offer">Offer line</option></select><select id="mwLang"><option value="en">English</option><option value="urdu">Roman Urdu</option></select></div>
+        <button class="btn full-btn" onclick="magicWrite()">✨ Write with AI</button>
+        <h4>Text combinations</h4><p class="muted small">Ek click mein tayyar heading + text set.</p>
+        <div class="combo-btns">
+          <button class="combo-btn" onclick="addCombo('sale')">🛍️ Sale combo</button>
+          <button class="combo-btn" onclick="addCombo('quote')">❝ Quote combo</button>
+          <button class="combo-btn" onclick="addCombo('product')">🏷️ Product combo</button>
+          <button class="combo-btn" onclick="addCombo('event')">🎉 Event combo</button>
+        </div>
         <h4>Font combinations</h4><div id="fontStyles"></div>
       </div>
       <div class="tabpage" id="tab-photos" style="display:none">
+        <h4>🤖 AI Photo</h4><p class="muted small">Jo chahiye likhein — AI photo bana dega. Free: 3/day · Pro: 30/day.</p>
+        <input id="aiPrompt" placeholder="e.g. delicious chicken biryani plate, top view">
+        <button class="btn full-btn" onclick="generateAiImage()">✨ Generate AI photo</button>
         <h4>Photos</h4><p class="muted small">Free stock photos — click to add.</p>
         <div class="photo-cats" id="photoCats" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>
         <div class="photo-grid" id="photoGrid"></div>
@@ -440,7 +464,12 @@ Visitors, 90</textarea>
         <h4>Gradients</h4><div class="swatches gradients" id="bgGradients"></div>
         <h4>Patterns</h4><div class="swatches" id="bgPatterns"></div>
       </div>
-      <div class="tabpage" id="tab-layers" style="display:none"><h4>Layers</h4><div id="layerList"></div></div>
+      <div class="tabpage" id="tab-layers" style="display:none"><h4>Layers</h4><div id="layerList"></div>
+        <h4 style="margin-top:18px">💬 Comments</h4>
+        <p class="muted small">Pins sirf editor mein dikhte hain — save/export mein nahi jate. Design par tabsara karein.</p>
+        <button class="btn btn-white full-btn" id="commentBtn" onclick="toggleCommentMode()">💬 Add comments</button>
+        <div id="commentList" style="margin-top:10px"></div>
+      </div>
     </aside>
     <section class="stage" id="stage">
       <div class="canvas-holder" id="canvasHolder"><canvas id="c"></canvas></div>
@@ -497,16 +526,35 @@ Visitors, 90</textarea>
 
 <div id="toast"></div>
 
+<div id="presentOverlay" style="display:none">
+  <img id="presentImg" alt="Slide">
+  <div class="present-bar">
+    <button class="ps-nav" onclick="presentNav(-1)">◀</button>
+    <span id="presentCount">1 / 1</span>
+    <button class="ps-nav" onclick="presentNav(1)">▶</button>
+    <span class="ps-timer" id="presentTimer">00:00</span>
+    <button class="ps-nav" onclick="editSlideNote()">📝 Note</button>
+    <button class="ps-nav" onclick="closePresent()">✕ Close</button>
+  </div>
+  <p id="presentNote"></p>
+</div>
+<div id="versionOverlay" style="display:none" onclick="if(event.target===this) closeVersions()">
+  <div class="version-card">
+    <div class="version-head"><b>🕐 Version history</b><button class="ps-x" onclick="closeVersions()">✕</button></div>
+    <div id="versionList"></div>
+  </div>
+</div>
 <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
 <script>if (!window.fabric) { document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"><\/script>'); }</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
 <script src="icons1.js?v=3"></script>
 <script src="icons2.js?v=3"></script>
 <script src="icons3.js?v=3"></script>
-<script src="app.js?v=32"></script>
+<script src="app.js?v=33"></script>
 <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(()=>{}); }</script>
 </body>
 </html>
