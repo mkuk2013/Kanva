@@ -2224,7 +2224,8 @@ function quotaLeft(kind){ const lim = isPro() ? 30 : (kind === 'img' ? 3 : 5); r
 loadAiQuota();
 async function getSubjectBlob(o){
   const mod = await import('https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.5.5/+esm');
-  return mod.removeBackground(o.getSrc(), { output: { format: 'image/png', quality: 1 } });
+  const blob = await (await fetch(o.getSrc())).blob();
+  return mod.removeBackground(blob, { publicPath: 'https://staticimgly.com/@imgly/background-removal-data/1.5.5/dist/', output: { format: 'image/png', quality: 1 } });
 }
 function swapImage(o, src){
   return new Promise(res => {
@@ -3097,5 +3098,233 @@ Object.assign(BUILDERS, {
    addAt(T('BIG NEWS HEADLINE', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.085, fill:'#ffffff', width: currentSize.w*.92 }), .5, .7);
    addAt(T('Watch the full story on our channel — details in description.', { fontFamily:'Inter', fontSize: currentSize.w*.024, fill:'#fecaca', width: currentSize.w*.88 }), .5, .82);
    addAt(T('NEWS 24/7', { fontFamily:'Montserrat', fontSize: currentSize.w*.022, fill:'#fca5a5', fontWeight:700, charSpacing: 200, width: currentSize.w*.6 }), .5, .14); }
+});
+/* ================= WAVE 6 TEMPLATES (33) ================= */
+TEMPLATES.push(
+ { id:'sehri', title:'Sehri & Iftar Timing', sub:'Ramadan time table post', cat:'Event', pro:false, size:'fb-post', bg:['#1e1b4b','#312e81'] },
+ { id:'barat', title:'Baraat Night', sub:'Wedding baraat celebration', cat:'Wedding', pro:true, size:'ig-post', bg:['#450a0a','#991b1b'] },
+ { id:'quranclass', title:'Online Quran Classes', sub:'Quran academy admissions', cat:'Education', pro:false, size:'ig-post', bg:['#022c22','#065f46'] },
+ { id:'madarsa', title:'Madarsa Admissions', sub:'Hifz & nazra admissions open', cat:'Education', pro:false, size:'ig-post', bg:['#052e16','#166534'] },
+ { id:'football', title:'Football Match', sub:'Match day announcement', cat:'Social Media', pro:false, size:'ig-post', bg:['#14532d','#15803d'] },
+ { id:'karate', title:'Karate Academy', sub:'Martial arts admissions', cat:'Fitness', pro:true, size:'ig-post', bg:['#18181b','#3f3f46'] },
+ { id:'dentist', title:'Dental Care', sub:'Dental clinic services', cat:'Business', pro:false, size:'ig-post', bg:['#f0f9ff','#0ea5e9'] },
+ { id:'optics', title:'Optics & Glasses', sub:'Eyewear shop promo', cat:'Business', pro:true, size:'ig-post', bg:['#fafaf9','#44403c'] },
+ { id:'barber', title:'Barber Shop', sub:'Gents salon & grooming', cat:'Business', pro:false, size:'ig-post', bg:['#1c1917','#292524'] },
+ { id:'carshowroom', title:'Car Showroom', sub:'New & used cars', cat:'Sale', pro:true, size:'ig-post', bg:['#111827','#1f2937'] },
+ { id:'bikesale', title:'Bike Sale', sub:'Motorcycles on installments', cat:'Sale', pro:false, size:'ig-post', bg:['#7f1d1d','#b91c1c'] },
+ { id:'perfume', title:'Perfume Collection', sub:'Fragrance sale', cat:'Fashion', pro:true, size:'ig-post', bg:['#181210','#78350f'] },
+ { id:'handbags', title:'Bags Collection', sub:'Ladies handbags new arrivals', cat:'Fashion', pro:false, size:'ig-post', bg:['#fdf2f8','#f9a8d4'] },
+ { id:'kurti', title:'Kurti Collection', sub:'Ladies kurti new designs', cat:'Fashion', pro:false, size:'ig-post', bg:['#fff7ed','#fdba74'] },
+ { id:'mehndidesign', title:'Mehndi Designs', sub:'Bridal mehndi booking', cat:'Wedding', pro:false, size:'ig-post', bg:['#3b0764','#7e22ce'] },
+ { id:'bbq', title:'BBQ Tonight', sub:'Live BBQ & karahi', cat:'Food', pro:true, size:'ig-post', bg:['#1c0a00','#7c2d12'] },
+ { id:'nashta', title:'Desi Nashta', sub:'Halwa puri nashta point', cat:'Food', pro:false, size:'ig-post', bg:['#fffbeb','#f59e0b'] },
+ { id:'construction', title:'Construction Co.', sub:'Builders & contractors', cat:'Business', pro:true, size:'fb-post', bg:['#292524','#57534e'] },
+ { id:'solarco', title:'Solar Solutions', sub:'Solar panels & installation', cat:'Business', pro:false, size:'ig-post', bg:['#082f49','#0369a1'] },
+ { id:'catering', title:'Catering Service', sub:'Events catering & daig', cat:'Food', pro:true, size:'fb-post', bg:['#431407','#9a3412'] },
+ { id:'driving', title:'Driving School', sub:'Learn driving in 15 days', cat:'Education', pro:false, size:'ig-post', bg:['#172554','#2563eb'] },
+ { id:'english', title:'Spoken English', sub:'English language course', cat:'Education', pro:true, size:'ig-post', bg:['#312e81','#4338ca'] },
+ { id:'compcourse', title:'Computer Course', sub:'DIT / CIT admissions', cat:'Education', pro:false, size:'ig-post', bg:['#0f172a','#155e75'] },
+ { id:'scholarship', title:'Scholarship Alert', sub:'Fully funded scholarships', cat:'Education', pro:false, size:'ig-post', bg:['#713f12','#a16207'] },
+ { id:'visa', title:'Visa Consultants', sub:'Visit & study visas', cat:'Business', pro:true, size:'fb-post', bg:['#1e3a8a','#1e40af'] },
+ { id:'umrah', title:'Umrah Packages', sub:'Umrah travel deals', cat:'Travel', pro:true, size:'ig-post', bg:['#022c22','#047857'] },
+ { id:'eidsale', title:'Eid Sale', sub:'Eid special discounts', cat:'Sale', pro:true, size:'ig-post', bg:['#064e3b','#059669'] },
+ { id:'ramadansale', title:'Ramadan Sale', sub:'Ramadan grocery deals', cat:'Sale', pro:false, size:'ig-post', bg:['#1e1b4b','#4c1d95'] },
+ { id:'independence', title:'14 August', sub:'Pakistan Independence Day', cat:'Event', pro:false, size:'ig-post', bg:['#052e16','#15803d'] },
+ { id:'newyear', title:'New Year Party', sub:'New year celebration night', cat:'Event', pro:true, size:'ig-story', bg:['#0f0c29','#302b63'] },
+ { id:'teachersday', title:'Teachers Day', sub:'Happy Teachers Day post', cat:'Education', pro:false, size:'ig-post', bg:['#fdf4ff','#a21caf'] },
+ { id:'blackfriday', title:'Black Friday', sub:'Black Friday sale event', cat:'Sale', pro:true, size:'ig-post', bg:['#09090b','#18181b'] },
+ { id:'summersale', title:'Summer Sale', sub:'Summer collection sale', cat:'Sale', pro:false, size:'ig-post', bg:['#fff7ed','#fb923c'] }
+);
+Object.assign(BUILDERS, {
+ sehri(){ gradRect('#1e1b4b','#312e81'); crescent(.5, .12, .05, '#facc15', '#1e1b4b'); starShape(.63, .09, .014, '#facc15');
+   addAt(T('SEHRI & IFTAR', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.075, fill:'#ffffff', width: currentSize.w*.94 }), .5, .3);
+   addAt(T('Timing — Ramadan Kareem', { fontFamily:'Poppins', fontSize: currentSize.w*.024, fill:'#c7d2fe', fontWeight:700, width: currentSize.w*.9 }), .5, .4);
+   pill('SEHRI: 5:10 AM', .3, .56, .34, '#facc15', '#1e1b4b', .022);
+   pill('IFTAR: 6:42 PM', .7, .56, .34, '#4338ca', '#ffffff', .022);
+   addAt(T('Apne sheher ke auqat ke mutabiq tasdeeq kar lein.', { fontFamily:'Inter', fontSize: currentSize.w*.017, fill:'#a5b4fc', width: currentSize.w*.86 }), .5, .72); },
+ barat(){ gradRect('#450a0a','#991b1b'); deco(.1,.1,.06,'#facc15',.7); deco(.9,.1,.06,'#facc15',.7); deco(.5,.93,.05,'#f59e0b',.5);
+   addAt(T('BARAAT', { fontFamily:'Playfair Display', fontSize: currentSize.w*.13, fill:'#facc15', fontWeight:700, charSpacing: 160, width: currentSize.w*.94 }), .5, .24);
+   addAt(T('The Wedding Celebration', { fontFamily:'Dancing Script', fontSize: currentSize.w*.06, fill:'#fee2e2', width: currentSize.w*.9 }), .5, .38);
+   addAt(T('Dhol, dhamaka aur bohat si khushiyan — aap ki shirkat hamare liye izzat hai.', { fontFamily:'Inter', fontSize: currentSize.w*.027, fill:'#fecaca', width: currentSize.w*.82, lineHeight:1.5 }), .5, .54);
+   pill('TONIGHT · 8 PM · CRYSTAL MARQUEE', .5, .7, .62, '#facc15', '#450a0a', .021); },
+ quranclass(){ gradRect('#022c22','#065f46'); deco(.88,.1,.06,'#34d399',.4);
+   addAt(T('﷽', { fontFamily:'Noto Nastaliq Urdu', fontSize: currentSize.w*.06, fill:'#a7f3d0', width: currentSize.w*.6, lineHeight: 1.9 }), .5, .1);
+   addAt(T('آن لائن قرآن کلاسز', { fontFamily:'Noto Nastaliq Urdu', fontSize: currentSize.w*.062, fill:'#ffffff', width: currentSize.w*.92, lineHeight: 1.9 }), .5, .28);
+   addAt(T('ONLINE QURAN CLASSES', { fontFamily:'Montserrat', fontSize: currentSize.w*.026, fill:'#6ee7b7', fontWeight:700, charSpacing: 240, width: currentSize.w*.92 }), .5, .44);
+   addAt(T('Nazra · Hifz · Tajweed — bachon aur baron ke liye, ladies teachers bhi dastiyab.', { fontFamily:'Inter', fontSize: currentSize.w*.026, fill:'#d1fae5', width: currentSize.w*.82, lineHeight:1.5 }), .5, .58);
+   pill('FREE TRIAL CLASS — WHATSAPP 0300-1110000', .5, .74, .7, '#facc15', '#022c22', .019); },
+ madarsa(){ gradRect('#052e16','#166534'); deco(.5,.07,.04,'#facc15',.7);
+   addAt(T('داخلے جاری ہیں', { fontFamily:'Noto Nastaliq Urdu', fontSize: currentSize.w*.07, fill:'#facc15', width: currentSize.w*.92, lineHeight: 1.9 }), .5, .2);
+   addAt(T('MADARSA ADMISSIONS', { fontFamily:'Montserrat', fontSize: currentSize.w*.03, fill:'#ffffff', fontWeight:700, charSpacing: 200, width: currentSize.w*.92 }), .5, .38);
+   addAt(T('Hifz-o-Nazra · Dars-e-Nizami — muft taleem, rehaish aur khana taleem-ul-Islam ke mahol mein.', { fontFamily:'Inter', fontSize: currentSize.w*.026, fill:'#dcfce7', width: currentSize.w*.82, lineHeight:1.5 }), .5, .53);
+   pill('SESSION 2026-27', .5, .68, .42, '#facc15', '#052e16', .023);
+   addAt(T('Jamia Masjid Road · 0345-1212121', { fontFamily:'Inter', fontSize: currentSize.w*.023, fill:'#bbf7d0', width: currentSize.w*.84 }), .5, .8); },
+ football(){ gradRect('#14532d','#16a34a'); deco(.5,.88,.16,'#ffffff',.16);
+   addAt(T('⚽', { fontFamily:'Poppins', fontSize: currentSize.w*.13, fill:'#ffffff', width: currentSize.w*.3 }), .5, .12);
+   addAt(T('MATCH DAY', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.135, fill:'#ffffff', width: currentSize.w*.96 }), .5, .3);
+   addAt(T('City FC vs United FC — dosto ke sath ground mein tashreef layen.', { fontFamily:'Inter', fontSize: currentSize.w*.028, fill:'#dcfce7', width: currentSize.w*.82, lineHeight:1.5 }), .5, .46);
+   pill('SUNDAY · 4 PM · CITY GROUND', .5, .62, .56, '#facc15', '#14532d', .022);
+   addAt(T('Entry bilkul FREE hai', { fontFamily:'Poppins', fontSize: currentSize.w*.026, fill:'#ffffff', fontWeight:700, width: currentSize.w*.8 }), .5, .76); },
+ karate(){ gradRect('#18181b','#27272a'); shade(0, .44, 1, .1, '#dc2626', 1);
+   addAt(T('KARATE', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.16, fill:'#ffffff', width: currentSize.w*.96 }), .5, .2);
+   addAt(T('ACADEMY', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.16, fill:'#dc2626', width: currentSize.w*.96 }), .5, .34);
+   addAt(T('Self defense · Discipline · Fitness — bachon ke liye behtareen mashghala.', { fontFamily:'Inter', fontSize: currentSize.w*.027, fill:'#e4e4e7', width: currentSize.w*.82, lineHeight:1.5 }), .5, .6);
+   pill('ADMISSIONS OPEN', .5, .74, .44, '#ffffff', '#18181b', .025); },
+ dentist(){ solidBg('#f0f9ff'); deco(.9,.08,.07,'#38bdf8',.35); deco(.07,.9,.05,'#0ea5e9',.3);
+   addAt(T('🦷', { fontFamily:'Poppins', fontSize: currentSize.w*.14, fill:'#0284c7', width: currentSize.w*.3 }), .5, .11);
+   addAt(T('DENTAL CARE', { fontFamily:'Poppins', fontSize: currentSize.w*.085, fill:'#0c4a6e', fontWeight:800, width: currentSize.w*.92 }), .5, .28);
+   addAt(T('Smile with confidence', { fontFamily:'Dancing Script', fontSize: currentSize.w*.055, fill:'#0284c7', width: currentSize.w*.9 }), .5, .39);
+   addAt(T('Scaling · Filling · Braces · Implants — dard ke baghair ilaj.', { fontFamily:'Inter', fontSize: currentSize.w*.027, fill:'#075985', width: currentSize.w*.82, lineHeight:1.5 }), .5, .53);
+   pill('APPOINTMENT: 0300-2323232', .5, .68, .52, '#0284c7', '#ffffff', .023); },
+ optics(){ solidBg('#fafaf9');
+   addAt(T('👓', { fontFamily:'Poppins', fontSize: currentSize.w*.13, fill:'#44403c', width: currentSize.w*.3 }), .5, .11);
+   addAt(T('OPTICS', { fontFamily:'Playfair Display', fontSize: currentSize.w*.11, fill:'#1c1917', fontWeight:700, charSpacing: 240, width: currentSize.w*.94 }), .5, .27);
+   addAt(T('& GLASSES', { fontFamily:'Montserrat', fontSize: currentSize.w*.032, fill:'#b45309', fontWeight:700, charSpacing: 400, width: currentSize.w*.9 }), .5, .38);
+   addAt(T('Branded frames · Computer glasses · Free eye test har khareedari par.', { fontFamily:'Inter', fontSize: currentSize.w*.027, fill:'#57534e', width: currentSize.w*.82, lineHeight:1.5 }), .5, .53);
+   badge('FREE\nEYE TEST', .84, .6, .19, '#b45309', '#ffffff');
+   pill('NEW FRAMES ARRIVED', .44, .72, .48, '#1c1917', '#ffffff', .023); },
+ barber(){ gradRect('#1c1917','#292524'); deco(.12,.12,.05,'#d4af37',.7); deco(.88,.86,.06,'#d4af37',.4);
+   addAt(T('✂️', { fontFamily:'Poppins', fontSize: currentSize.w*.11, fill:'#d4af37', width: currentSize.w*.3 }), .5, .1);
+   addAt(T('BARBER', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.14, fill:'#fafaf9', width: currentSize.w*.94 }), .5, .26);
+   addAt(T('SHOP', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.14, fill:'#d4af37', width: currentSize.w*.94 }), .5, .4);
+   addAt(T('Haircut · Beard styling · Facial — saaf mahol, mahir ustaad.', { fontFamily:'Inter', fontSize: currentSize.w*.027, fill:'#d6d3d1', width: currentSize.w*.82, lineHeight:1.5 }), .5, .57);
+   pill('HAIRCUT FROM RS 300', .5, .72, .48, '#d4af37', '#1c1917', .024); },
+ carshowroom(){ return addPhoto(PH('carshow5'), 0, 0, 1, 1).then(() => { shade(0, .58, 1, .42, '#000000', .62);
+   pill('CAR SHOWROOM', .26, .64, .38, '#facc15', '#111827', .023);
+   addAt(T('Drive Your Dream', { fontFamily:'Poppins', fontSize: currentSize.w*.062, fill:'#ffffff', fontWeight:800, width: currentSize.w*.92 }), .5, .73);
+   addAt(T('New & used cars · Asaan iqsaat · Exchange offer bhi dastiyab.', { fontFamily:'Inter', fontSize: currentSize.w*.024, fill:'#e5e7eb', width: currentSize.w*.86 }), .5, .83);
+   addAt(T('Main Highway Road · 0300-4545454', { fontFamily:'Montserrat', fontSize: currentSize.w*.021, fill:'#facc15', fontWeight:700, width: currentSize.w*.84 }), .5, .91); }); },
+ bikesale(){ gradRect('#7f1d1d','#991b1b'); deco(.9,.1,.07,'#fca5a5',.4);
+   addAt(T('🏍️', { fontFamily:'Poppins', fontSize: currentSize.w*.12, fill:'#ffffff', width: currentSize.w*.3 }), .5, .1);
+   addAt(T('BIKE SALE', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.135, fill:'#ffffff', width: currentSize.w*.96 }), .5, .26);
+   addAt(T('70cc · 125cc · 150cc — tamam models', { fontFamily:'Poppins', fontSize: currentSize.w*.03, fill:'#fecaca', fontWeight:700, width: currentSize.w*.9 }), .5, .39);
+   addAt(T('Naqad aur asaan iqsaat — pehli qist par bike ghar le jayen.', { fontFamily:'Inter', fontSize: currentSize.w*.027, fill:'#fee2e2', width: currentSize.w*.82, lineHeight:1.5 }), .5, .53);
+   badge('0%\nMARKUP', .85, .58, .19, '#facc15', '#7f1d1d');
+   pill('BOOK NOW', .42, .72, .34, '#ffffff', '#7f1d1d', .026); },
+ perfume(){ return addPhoto(PH('perfume5'), 0, 0, 1, 1).then(() => { shade(0, 0, .55, 1, '#120a06', .66);
+   addAt(T('PERFUME', { fontFamily:'Playfair Display', fontSize: currentSize.w*.05, fill:'#fbbf24', fontWeight:700, charSpacing: 200, width: currentSize.w*.5 }), .3, .3);
+   addAt(T('Collection', { fontFamily:'Dancing Script', fontSize: currentSize.w*.055, fill:'#ffffff', width: currentSize.w*.5 }), .3, .4);
+   addAt(T('Long lasting fragrances — imported & local brands.', { fontFamily:'Inter', fontSize: currentSize.w*.016, fill:'#fde68a', width: currentSize.w*.46, lineHeight:1.5 }), .3, .52);
+   addAt(T('From Rs 1,499', { fontFamily:'Montserrat', fontSize: currentSize.w*.017, fill:'#ffffff', fontWeight:700, width: currentSize.w*.46 }), .3, .64); }); },
+ handbags(){ solidBg('#fdf2f8'); deco(.08,.1,.06,'#ec4899',.3); deco(.92,.88,.07,'#f9a8d4',.45);
+   pill('NEW ARRIVALS', .5, .11, .4, '#ec4899', '#ffffff', .024);
+   addAt(T('Bags', { fontFamily:'Playfair Display', fontSize: currentSize.w*.12, fill:'#831843', fontWeight:700, width: currentSize.w*.92 }), .5, .26);
+   addAt(T('COLLECTION', { fontFamily:'Montserrat', fontSize: currentSize.w*.034, fill:'#be185d', fontWeight:700, charSpacing: 380, width: currentSize.w*.92 }), .5, .38);
+   addAt(T('Handbags · Clutches · Totes — har rang, har style.', { fontFamily:'Inter', fontSize: currentSize.w*.027, fill:'#9d174d', width: currentSize.w*.82, lineHeight:1.5 }), .5, .53);
+   badge('25%\nOFF', .85, .58, .19, '#f59e0b', '#831843');
+   pill('FROM RS 1,299', .44, .72, .4, '#831843', '#ffffff', .024); },
+ kurti(){ return addPhoto(PH('kurti5'), 0, 0, 1, 1).then(() => { shade(.52, 0, .48, 1, '#ffffff', .88);
+   addAt(T('KURTI', { fontFamily:'Poppins', fontSize: currentSize.w*.045, fill:'#9a3412', fontWeight:800, charSpacing: 160, width: currentSize.w*.42 }), .75, .28);
+   addAt(T('Collection', { fontFamily:'Dancing Script', fontSize: currentSize.w*.05, fill:'#c2410c', width: currentSize.w*.42 }), .75, .37);
+   addAt(T('Printed · Embroidered · Lawn — naye designs har hafta.', { fontFamily:'Inter', fontSize: currentSize.w*.015, fill:'#7c2d12', width: currentSize.w*.4, lineHeight:1.5 }), .75, .5);
+   addAt(T('From Rs 999', { fontFamily:'Montserrat', fontSize: currentSize.w*.016, fill:'#9a3412', fontWeight:700, width: currentSize.w*.4 }), .75, .63); }); },
+ mehndidesign(){ gradRect('#3b0764','#6d28d9'); deco(.1,.12,.06,'#facc15',.55); deco(.9,.85,.07,'#c084fc',.4);
+   addAt(T('Mehndi', { fontFamily:'Dancing Script', fontSize: currentSize.w*.125, fill:'#facc15', width: currentSize.w*.94 }), .5, .18);
+   addAt(T('DESIGNS', { fontFamily:'Montserrat', fontSize: currentSize.w*.034, fill:'#e9d5ff', fontWeight:700, charSpacing: 420, width: currentSize.w*.92 }), .5, .32);
+   addAt(T('Bridal full hands · Party mehndi · Arabic styles — ghar par service bhi dastiyab.', { fontFamily:'Inter', fontSize: currentSize.w*.027, fill:'#f3e8ff', width: currentSize.w*.82, lineHeight:1.5 }), .5, .48);
+   pill('BOOKING: 0333-5656565', .5, .64, .5, '#facc15', '#3b0764', .023);
+   addAt(T('Eid aur shadion ki advance booking jari hai', { fontFamily:'Inter', fontSize: currentSize.w*.023, fill:'#e9d5ff', width: currentSize.w*.84 }), .5, .78); },
+ bbq(){ return addPhoto(PH('bbq5'), 0, 0, 1, 1).then(() => { shade(0, .55, 1, .45, '#1c0a00', .78);
+   addAt(T('BBQ TONIGHT', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.115, fill:'#ffffff', width: currentSize.w*.95 }), .5, .63);
+   addAt(T('Live BBQ · Chicken Karahi · Malai Boti', { fontFamily:'Poppins', fontSize: currentSize.w*.028, fill:'#fdba74', fontWeight:700, width: currentSize.w*.9 }), .5, .75);
+   pill('FAMILY HALL AVAILABLE', .5, .86, .5, '#ea580c', '#ffffff', .023); }); },
+ nashta(){ return addPhoto(PH('nashta5'), 0, 0, 1, 1).then(() => { shade(0, 0, 1, .42, '#fffbeb', .9);
+   addAt(T('DESI NASHTA', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.105, fill:'#92400e', width: currentSize.w*.95 }), .5, .09);
+   addAt(T('Halwa Puri · Siri Paye · Lassi', { fontFamily:'Poppins', fontSize: currentSize.w*.028, fill:'#b45309', fontWeight:700, width: currentSize.w*.92 }), .5, .21);
+   pill('SUBAH 6 SE 12 TAK', .5, .32, .46, '#d97706', '#ffffff', .023); }); },
+ construction(){ gradRect('#292524','#44403c'); deco(.9,.88,.08,'#f59e0b',.35);
+   pill('BUILDERS & CONTRACTORS', .5, .11, .56, '#f59e0b', '#292524', .022);
+   addAt(T('CONSTRUCTION', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.105, fill:'#ffffff', width: currentSize.w*.96 }), .5, .26);
+   addAt(T('COMPANY', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.105, fill:'#f59e0b', width: currentSize.w*.96 }), .5, .37);
+   addAt(T('Ghar · Plaza · Renovation — mazboot bunyad, waqt par delivery.', { fontFamily:'Inter', fontSize: currentSize.w*.027, fill:'#e7e5e4', width: currentSize.w*.82, lineHeight:1.5 }), .5, .55);
+   pill('FREE ESTIMATE', .5, .7, .42, '#ffffff', '#292524', .024); },
+ solarco(){ gradRect('#082f49','#075985'); deco(.88,.12,.09,'#facc15',.75); deco(.1,.86,.05,'#38bdf8',.4);
+   addAt(T('☀️', { fontFamily:'Poppins', fontSize: currentSize.w*.12, fill:'#facc15', width: currentSize.w*.3 }), .5, .1);
+   addAt(T('SOLAR', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.14, fill:'#ffffff', width: currentSize.w*.94 }), .5, .26);
+   addAt(T('SOLUTIONS', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.14, fill:'#38bdf8', width: currentSize.w*.94 }), .5, .4);
+   addAt(T('Loadshedding ka khaatma — panels, inverters aur complete installation.', { fontFamily:'Inter', fontSize: currentSize.w*.027, fill:'#e0f2fe', width: currentSize.w*.82, lineHeight:1.5 }), .5, .57);
+   pill('FREE SITE SURVEY', .5, .73, .44, '#facc15', '#082f49', .025); },
+ catering(){ gradRect('#431407','#7c2d12');
+   pill('CATERING SERVICE', .5, .11, .48, '#f59e0b', '#431407', .023);
+   addAt(T('Shaadi ka Khana,', { fontFamily:'Playfair Display', fontSize: currentSize.w*.075, fill:'#ffffff', fontWeight:700, width: currentSize.w*.92 }), .5, .25);
+   addAt(T('Hamari Zimmedari', { fontFamily:'Playfair Display', fontSize: currentSize.w*.075, fill:'#fdba74', fontWeight:700, width: currentSize.w*.92 }), .5, .35);
+   addAt(T('Daig · Live BBQ · Complete event khana — 100 se 2000 afrad tak.', { fontFamily:'Inter', fontSize: currentSize.w*.026, fill:'#ffedd5', width: currentSize.w*.82, lineHeight:1.5 }), .5, .52);
+   pill('BOOKING: 0300-6767676', .5, .68, .5, '#ffffff', '#431407', .023); },
+ driving(){ gradRect('#172554','#1d4ed8'); deco(.9,.12,.07,'#60a5fa',.45);
+   addAt(T('🚗', { fontFamily:'Poppins', fontSize: currentSize.w*.12, fill:'#ffffff', width: currentSize.w*.3 }), .5, .1);
+   addAt(T('DRIVING SCHOOL', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.105, fill:'#ffffff', width: currentSize.w*.96 }), .5, .27);
+   addAt(T('Sirf 15 din mein driving seekhein', { fontFamily:'Poppins', fontSize: currentSize.w*.03, fill:'#bfdbfe', fontWeight:700, width: currentSize.w*.9 }), .5, .39);
+   addAt(T('Manual & automatic cars · Ladies instructor bhi dastiyab · License mein rehnumai.', { fontFamily:'Inter', fontSize: currentSize.w*.026, fill:'#dbeafe', width: currentSize.w*.82, lineHeight:1.5 }), .5, .54);
+   pill('ADMISSION OPEN', .5, .7, .42, '#facc15', '#172554', .024); },
+ english(){ gradRect('#312e81','#4338ca'); deco(.08,.88,.06,'#818cf8',.5); deco(.92,.1,.05,'#f59e0b',.5);
+   pill('LANGUAGE COURSE', .5, .11, .44, '#f59e0b', '#312e81', .023);
+   addAt(T('SPOKEN', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.135, fill:'#ffffff', width: currentSize.w*.94 }), .5, .26);
+   addAt(T('ENGLISH', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.135, fill:'#a5b4fc', width: currentSize.w*.94 }), .5, .4);
+   addAt(T('Bolna seekhein aitmaad ke sath — grammar, vocabulary aur roz ki practice.', { fontFamily:'Inter', fontSize: currentSize.w*.027, fill:'#e0e7ff', width: currentSize.w*.82, lineHeight:1.5 }), .5, .57);
+   pill('NEW BATCH — MONDAY SE', .5, .73, .5, '#ffffff', '#312e81', .023); },
+ compcourse(){ gradRect('#0f172a','#164e63'); deco(.9,.1,.07,'#22d3ee',.4); deco(.07,.88,.05,'#2dd4bf',.35);
+   addAt(T('💻', { fontFamily:'Poppins', fontSize: currentSize.w*.12, fill:'#22d3ee', width: currentSize.w*.3 }), .5, .1);
+   addAt(T('COMPUTER', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.125, fill:'#ffffff', width: currentSize.w*.96 }), .5, .27);
+   addAt(T('COURSE', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.125, fill:'#2dd4bf', width: currentSize.w*.96 }), .5, .4);
+   addAt(T('DIT · CIT · MS Office — certificate ke sath, rozgar ki rehnumai bhi.', { fontFamily:'Inter', fontSize: currentSize.w*.027, fill:'#cffafe', width: currentSize.w*.82, lineHeight:1.5 }), .5, .56);
+   pill('ADMISSIONS OPEN', .5, .72, .42, '#facc15', '#0f172a', .025); },
+ scholarship(){ gradRect('#713f12','#92400e'); deco(.5,.06,.05,'#facc15',.8); deco(.1,.88,.05,'#fbbf24',.4);
+   addAt(T('🎓', { fontFamily:'Poppins', fontSize: currentSize.w*.12, fill:'#facc15', width: currentSize.w*.3 }), .5, .11);
+   addAt(T('SCHOLARSHIP', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.115, fill:'#ffffff', width: currentSize.w*.96 }), .5, .28);
+   addAt(T('ALERT 2026', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.115, fill:'#facc15', width: currentSize.w*.96 }), .5, .4);
+   addAt(T('Fully funded taleem ka mauqa — akhri tareekh se pehle apply karein.', { fontFamily:'Inter', fontSize: currentSize.w*.027, fill:'#fef3c7', width: currentSize.w*.82, lineHeight:1.5 }), .5, .56);
+   pill('DETAILS KE LIYE MESSAGE KAREIN', .5, .72, .6, '#ffffff', '#713f12', .021); },
+ visa(){ gradRect('#1e3a8a','#1e40af');
+   addAt(T('✈️', { fontFamily:'Poppins', fontSize: currentSize.w*.12, fill:'#ffffff', width: currentSize.w*.3 }), .5, .1);
+   addAt(T('VISA CONSULTANTS', { fontFamily:'Poppins', fontSize: currentSize.w*.07, fill:'#ffffff', fontWeight:800, width: currentSize.w*.94 }), .5, .27);
+   addAt(T('Visit · Study · Work — saaf mashwara, sahi file tayyari, koi jhooti umeed nahi.', { fontFamily:'Inter', fontSize: currentSize.w*.026, fill:'#bfdbfe', width: currentSize.w*.82, lineHeight:1.5 }), .5, .42);
+   pill('FREE ASSESSMENT', .5, .58, .44, '#facc15', '#1e3a8a', .024);
+   addAt(T('UK · USA · Canada · Australia · Europe', { fontFamily:'Montserrat', fontSize: currentSize.w*.023, fill:'#dbeafe', fontWeight:700, width: currentSize.w*.86 }), .5, .72); },
+ umrah(){ gradRect('#022c22','#065f46'); crescent(.5, .11, .05, '#facc15', '#022c22'); starShape(.63, .08, .014, '#facc15'); deco(.1,.88,.05,'#34d399',.4); deco(.9,.88,.05,'#34d399',.4);
+   addAt(T('UMRAH PACKAGES', { fontFamily:'Poppins', fontSize: currentSize.w*.075, fill:'#ffffff', fontWeight:800, width: currentSize.w*.94 }), .5, .25);
+   addAt(T('Makkah & Madinah — qareebi hotels, direct flights, mukammal rehnumai.', { fontFamily:'Inter', fontSize: currentSize.w*.027, fill:'#d1fae5', width: currentSize.w*.82, lineHeight:1.5 }), .5, .4);
+   pill('21 DAYS — RS 285,000 SE', .5, .56, .52, '#facc15', '#022c22', .022);
+   addAt(T('Group har mahine rawana hota hai — apni seat aaj hi book karwayen.', { fontFamily:'Inter', fontSize: currentSize.w*.024, fill:'#a7f3d0', width: currentSize.w*.84 }), .5, .7); },
+ eidsale(){ gradRect('#064e3b','#047857'); crescent(.88, .1, .04, '#facc15', '#064e3b'); deco(.08,.12,.05,'#34d399',.5);
+   addAt(T('EID', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.16, fill:'#ffffff', width: currentSize.w*.94 }), .5, .2);
+   addAt(T('SALE', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.16, fill:'#facc15', width: currentSize.w*.94 }), .5, .34);
+   addAt(T('Eid ki tayyari, hamari zimmedari — kapre, jootay, mithaas sab par discount.', { fontFamily:'Inter', fontSize: currentSize.w*.027, fill:'#d1fae5', width: currentSize.w*.82, lineHeight:1.5 }), .5, .54);
+   badge('50%\nOFF', .84, .6, .2, '#dc2626', '#ffffff');
+   pill('CHAND RAAT TAK', .42, .72, .42, '#ffffff', '#064e3b', .024); },
+ ramadansale(){ gradRect('#1e1b4b','#4c1d95'); crescent(.5, .1, .045, '#facc15', '#1e1b4b'); starShape(.62, .08, .013, '#facc15');
+   addAt(T('RAMADAN SALE', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.115, fill:'#ffffff', width: currentSize.w*.96 }), .5, .26);
+   addAt(T('Bachat ka mahina — grocery, khajoor aur iftar items par khaas rates.', { fontFamily:'Inter', fontSize: currentSize.w*.027, fill:'#e9d5ff', width: currentSize.w*.82, lineHeight:1.5 }), .5, .41);
+   badge('30%\nOFF', .84, .52, .2, '#facc15', '#1e1b4b');
+   pill('HOME DELIVERY FREE', .44, .66, .48, '#facc15', '#1e1b4b', .023);
+   addAt(T('Offer sirf pehle ashray tak', { fontFamily:'Inter', fontSize: currentSize.w*.023, fill:'#ddd6fe', width: currentSize.w*.8 }), .5, .8); },
+ independence(){ gradRect('#052e16','#15803d'); shade(0, 0, .14, 1, '#ffffff', .92);
+   addAt(T('14 AUGUST', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.125, fill:'#ffffff', width: currentSize.w*.96 }), .55, .24);
+   addAt(T('Jashn-e-Azadi Mubarak', { fontFamily:'Poppins', fontSize: currentSize.w*.036, fill:'#bbf7d0', fontWeight:700, width: currentSize.w*.86 }), .55, .37);
+   addAt(T('Pakistan Zindabad — ye watan hamari pehchan hai.', { fontFamily:'Inter', fontSize: currentSize.w*.026, fill:'#dcfce7', width: currentSize.w*.8, lineHeight:1.5 }), .55, .5);
+   addAt(T('پاکستان زندہ باد', { fontFamily:'Noto Nastaliq Urdu', fontSize: currentSize.w*.045, fill:'#facc15', width: currentSize.w*.8, lineHeight: 1.9 }), .55, .64); },
+ newyear(){ gradRect('#0f0c29','#302b63'); deco(.12,.1,.05,'#facc15',.8); deco(.86,.16,.04,'#f472b6',.8); deco(.2,.84,.04,'#38bdf8',.7); deco(.9,.8,.05,'#facc15',.6);
+   addAt(T('HAPPY', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.095, fill:'#ffffff', width: currentSize.w*.94 }), .5, .16);
+   addAt(T('NEW YEAR', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.095, fill:'#facc15', width: currentSize.w*.94 }), .5, .26);
+   addAt(T('2027', { fontFamily:'Playfair Display', fontSize: currentSize.w*.11, fill:'#ffffff', fontWeight:700, width: currentSize.w*.9 }), .5, .38);
+   addAt(T('Naya saal, nayi ummeedein — aap sab ko dili mubarakbad.', { fontFamily:'Inter', fontSize: currentSize.w*.02, fill:'#c7d2fe', width: currentSize.w*.82, lineHeight:1.5 }), .5, .54);
+   pill('PARTY · 31 DEC NIGHT', .5, .68, .44, '#f472b6', '#ffffff', .018); },
+ teachersday(){ solidBg('#fdf4ff'); deco(.09,.1,.06,'#d946ef',.35); deco(.91,.88,.06,'#f59e0b',.35);
+   addAt(T('🍎', { fontFamily:'Poppins', fontSize: currentSize.w*.12, fill:'#a21caf', width: currentSize.w*.3 }), .5, .1);
+   addAt(T('Happy', { fontFamily:'Dancing Script', fontSize: currentSize.w*.09, fill:'#a21caf', width: currentSize.w*.92 }), .5, .25);
+   addAt(T('TEACHERS DAY', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.105, fill:'#701a75', width: currentSize.w*.96 }), .5, .37);
+   addAt(T('Ustaad ka ek din nahi hota — har din unhi ki mehnat ka phal hai. Shukriya, teachers!', { fontFamily:'Inter', fontSize: currentSize.w*.026, fill:'#86198f', width: currentSize.w*.82, lineHeight:1.5 }), .5, .54);
+   pill('5 OCTOBER', .5, .7, .34, '#a21caf', '#ffffff', .024); },
+ blackfriday(){ solidBg('#09090b'); deco(.5,.06,.05,'#dc2626',.9);
+   addAt(T('BLACK', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.16, fill:'#ffffff', width: currentSize.w*.96 }), .5, .16);
+   addAt(T('FRIDAY', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.16, fill:'#dc2626', width: currentSize.w*.96 }), .5, .3);
+   badge('UP TO\n60% OFF', .5, .5, .3, '#dc2626', '#ffffff');
+   addAt(T('Sirf ek din — saal ki sab se bari sale!', { fontFamily:'Poppins', fontSize: currentSize.w*.028, fill:'#e4e4e7', fontWeight:700, width: currentSize.w*.86 }), .5, .7);
+   pill('SHOP NOW', .5, .82, .36, '#ffffff', '#09090b', .025); },
+ summersale(){ gradRect('#fff7ed','#ffedd5'); deco(.9,.08,.09,'#fb923c',.55); deco(.06,.88,.06,'#facc15',.5);
+   addAt(T('SUMMER', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.14, fill:'#9a3412', width: currentSize.w*.94 }), .5, .16);
+   addAt(T('SALE', { fontFamily:'Bebas Neue', fontSize: currentSize.w*.14, fill:'#ea580c', width: currentSize.w*.94 }), .5, .3);
+   addAt(T('Lawn · Cotton · Casuals — garmiyon ka halka phulka fashion.', { fontFamily:'Inter', fontSize: currentSize.w*.028, fill:'#7c2d12', width: currentSize.w*.82, lineHeight:1.5 }), .5, .46);
+   badge('40%\nOFF', .84, .54, .2, '#dc2626', '#ffffff');
+   pill('SHOP THE SEASON', .44, .68, .46, '#9a3412', '#ffffff', .024); }
 });
 
