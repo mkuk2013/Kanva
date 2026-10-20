@@ -325,7 +325,7 @@ function saveBrand(b){
   }
   localStorage.setItem(brandKey(), JSON.stringify(b));
 }
-function requirePro(feature){ if (isPro()) return true; toast('🔒 ' + feature + ' is a Pro feature'); openPayment('monthly'); return false; }
+function requirePro(feature){ if (isPro()) return true; refreshProfile(); toast('🔒 ' + feature + ' is a Pro feature'); openPayment('monthly'); return false; }
 
 /* ---------------- APP SHELL ---------------- */
 function enterApp(){
@@ -358,6 +358,27 @@ function goPage(p){
   window.scrollTo(0,0);
   const mc = document.querySelector('.main-col'); if (mc) mc.scrollTop = 0;
 }
+let __profRefreshing = false;
+async function refreshProfile(){
+  if (!isCloud() || !cloudUser || __profRefreshing) return;
+  __profRefreshing = true;
+  try {
+    const r = await sb.from('profiles').select('*').eq('id', cloudUser.id).maybeSingle();
+    if (r && r.data){
+      const oldPlan = (profileRow && profileRow.plan) || 'free';
+      profileRow = r.data;
+      if (r.data.blocked){ toast('🚫 Ye account admin ne block kar diya hai.'); try { await sb.auth.signOut(); } catch(e){} location.reload(); return; }
+      if ((r.data.plan || 'free') !== oldPlan){
+        refreshPlanUI();
+        if (r.data.plan === 'pro') toast('🎉 Mubarak ho! Aap ka Pro plan active ho gaya hai ⚡');
+      }
+    }
+  } catch(e){}
+  __profRefreshing = false;
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshProfile(); });
+window.addEventListener('focus', () => refreshProfile());
+setInterval(() => { if (!document.hidden) refreshProfile(); }, 45000);
 function refreshPlanUI(){
   const pro = isPro();
   ['planBadge','planBadge2'].forEach(id => { const b = document.getElementById(id); if (b){ b.textContent = pro ? '⚡ PRO' : 'FREE'; b.className = 'plan-badge ' + (pro ? 'pro' : 'free'); } });
@@ -2430,9 +2451,13 @@ async function setOrder(id, status){
     const { error } = await sb.from('orders').update({ status }).eq('id', id);
     if (error){ toast('⚠️ ' + error.message); return; }
     if (status === 'approved' && o && o.user_id){
-      await sb.from('profiles').update({ plan: 'pro' }).eq('id', o.user_id);
-      if (profileRow && cloudUser && o.user_id === cloudUser.id){ profileRow.plan = 'pro'; refreshPlanUI(); }
-      toast('⚡ Pro activated for ' + (o.email || 'user'));
+      const pu = await sb.from('profiles').update({ plan: 'pro' }).eq('id', o.user_id).select();
+      if (pu.error){ toast('⚠️ Order approved, lekin Pro activate NAHI hua: ' + pu.error.message); }
+      else if (!pu.data || !pu.data.length){ toast('⚠️ Order approved, lekin Pro database mein save NAHI hua (0 rows) — SQL policy fix chahiye.'); }
+      else {
+        if (profileRow && cloudUser && o.user_id === cloudUser.id){ profileRow.plan = 'pro'; refreshPlanUI(); }
+        toast('⚡ Pro activated for ' + (o.email || 'user'));
+      }
     }
     await loadAdminData();
   } else {
@@ -2506,8 +2531,9 @@ async function renderSuperAdmin(){
 async function saSetPlan(email, plan){
   if (isCloud()){
     const u = (adminUsersCache || []).find(x => x.email === email); if (!u) return;
-    const { error } = await sb.from('profiles').update({ plan }).eq('id', u.id);
+    const { data, error } = await sb.from('profiles').update({ plan }).eq('id', u.id).select();
     if (error){ toast('⚠️ ' + error.message); return; }
+    if (!data || !data.length){ toast('⚠️ Save NAHI hua — database ne plan update nahi kiya (0 rows). SQL policy fix chahiye.'); return; }
     u.plan = plan;
     if (profileRow && cloudUser && u.id === cloudUser.id){ profileRow.plan = plan; refreshPlanUI(); }
   } else {
@@ -2520,8 +2546,9 @@ async function saSetPlan(email, plan){
 async function saToggleBlock(email){
   if (!isCloud()){ toast('Block cloud accounts par lagta hai — Super Admin apne asal account se login karke khulta hai'); return; }
   const u = (adminUsersCache || []).find(x => x.email === email); if (!u) return;
-  const { error } = await sb.from('profiles').update({ blocked: !u.blocked }).eq('id', u.id);
+  const { data, error } = await sb.from('profiles').update({ blocked: !u.blocked }).eq('id', u.id).select();
   if (error){ toast('⚠️ ' + error.message); return; }
+  if (!data || !data.length){ toast('⚠️ Save NAHI hua — database ne block update nahi kiya (0 rows). SQL policy fix chahiye.'); return; }
   u.blocked = !u.blocked;
   await renderSuperAdmin();
   toast(u.blocked ? '🚫 ' + email + ' blocked — ab login nahi ho sakega' : '✅ ' + email + ' unblocked');
